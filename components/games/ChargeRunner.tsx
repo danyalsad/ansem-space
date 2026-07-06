@@ -2,20 +2,20 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Pause, Play, RotateCcw, Share2, Shield, Trophy, Zap } from "lucide-react";
+import { Pause, Play, RotateCcw, Share2, Trophy, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useWallet } from "@/components/WalletProvider";
 import { useHerd } from "@/components/HerdProvider";
 import { drawBull } from "@/lib/bull";
 import { slotUrl } from "@/lib/asset-manifest";
+import { sfx } from "@/lib/arcade-audio";
 import { LS, shareOnX } from "@/lib/constants";
 import { loadHighs, saveHigh, submitScore, type ArcadeScore } from "@/lib/games";
-import { BONE, CRIMSON, CRIMSON_BRIGHT, GOLD, GOLD_BRIGHT, VOID } from "@/lib/palette";
+import { BONE, CRIMSON_BRIGHT, GOLD, GOLD_BRIGHT, GREEN, VOID } from "@/lib/palette";
 import { fireConfetti } from "@/lib/confetti";
 import { claimDailyChallenge } from "@/lib/quests";
 import { cn, shortAddress, store } from "@/lib/utils";
 
-/* ── tuning (game feel) ── */
 const W = 900;
 const H = 420;
 const GROUND = H - 72;
@@ -26,12 +26,24 @@ const JUMP_V = -880;
 const JUMP_CUT = 0.42;
 const COYOTE_S = 0.16;
 const BUFFER_S = 0.18;
-const MAX_SPEED = 460;
+const MAX_SPEED = 480;
 const BASE_SPEED = 240;
-const WARMUP_S = 5;
+const WARMUP_S = 4;
 
 type Phase = "idle" | "countdown" | "running" | "paused" | "over";
-type EntityKind = "paperhand" | "beartrap" | "coin" | "solbag" | "shield" | "magnet";
+type EntityKind =
+  | "paperhand"
+  | "beartrap"
+  | "coin"
+  | "solbag"
+  | "shield"
+  | "magnet"
+  | "dip"
+  | "pump"
+  | "whale"
+  | "flybear";
+
+type MarketZone = "warmup" | "bull" | "meme" | "bear";
 
 interface Entity {
   x: number;
@@ -41,6 +53,9 @@ interface Entity {
   kind: EntityKind;
   collected?: boolean;
   spin?: number;
+  nearMissed?: boolean;
+  passed?: boolean;
+  bob?: number;
 }
 
 interface Particle {
@@ -59,12 +74,21 @@ interface Popup {
   text: string;
   life: number;
   scale: number;
+  color?: string;
+}
+
+interface Star {
+  x: number;
+  y: number;
+  s: number;
+  tw: number;
 }
 
 interface GameState {
   phase: Phase;
   popups: Popup[];
   particles: Particle[];
+  stars: Star[];
   bullY: number;
   bullVy: number;
   jumpsLeft: number;
@@ -83,12 +107,19 @@ interface GameState {
   shield: number;
   magnetT: number;
   invulnT: number;
+  boostT: number;
   entities: Entity[];
   spawnIn: number;
   time: number;
   sinceObstacle: number;
   countdown: number;
   flashT: number;
+  shakeT: number;
+  zoneBanner: string;
+  zoneBannerT: number;
+  nearMisses: number;
+  runFrame: number;
+  milestones: number;
   raf: number;
   last: number;
 }
@@ -101,6 +132,20 @@ const SPRITE_SLOTS: Record<string, SpriteKey> = {
   "sprite-coin": "coin",
   "sprite-solbag": "solbag",
 };
+
+const ZONE_META: Record<MarketZone, { label: string; sky: [string, string, string]; tint: string }> = {
+  warmup: { label: "WARM UP", sky: ["#050508", VOID, "#1a1220"], tint: "rgba(212,175,55,0)" },
+  bull: { label: "BULL RUN", sky: ["#0a0810", "#120f1a", "#1e1528"], tint: "rgba(212,175,55,0.08)" },
+  meme: { label: "MEME SEASON", sky: ["#0f0818", "#1a0f28", "#281838"], tint: "rgba(180,100,255,0.1)" },
+  bear: { label: "BEAR MARKET", sky: ["#080a12", "#101828", "#1a2030"], tint: "rgba(200,16,46,0.12)" },
+};
+
+function getZone(t: number): MarketZone {
+  if (t < WARMUP_S) return "warmup";
+  if (t < 22) return "bull";
+  if (t < 48) return "meme";
+  return "bear";
+}
 
 function getDailyChallenge() {
   const day = new Date().toISOString().slice(0, 10);
@@ -115,7 +160,8 @@ function getDailyChallenge() {
 }
 
 function calcScore(g: GameState) {
-  return Math.floor(g.distance + g.coins * 100 + g.bonus);
+  const boost = g.boostT > 0 ? 1.35 : 1;
+  return Math.floor((g.distance + g.coins * 100 + g.bonus + g.nearMisses * 25) * boost);
 }
 
 function burst(g: GameState, x: number, y: number, color: string, n = 8) {
@@ -133,11 +179,34 @@ function burst(g: GameState, x: number, y: number, color: string, n = 8) {
   }
 }
 
+function dustKick(g: GameState) {
+  for (let i = 0; i < 4; i++) {
+    g.particles.push({
+      x: BULL_X + 10 + Math.random() * 20,
+      y: GROUND - 4,
+      vx: -60 - Math.random() * 80,
+      vy: -30 - Math.random() * 40,
+      life: 0.25 + Math.random() * 0.15,
+      color: "rgba(212,175,55,0.45)",
+      size: 2 + Math.random() * 2,
+    });
+  }
+}
+
+function makeStars(): Star[] {
+  const stars: Star[] = [];
+  for (let i = 0; i < 48; i++) {
+    stars.push({ x: Math.random() * W, y: Math.random() * GROUND * 0.65, s: 0.5 + Math.random() * 1.5, tw: Math.random() * Math.PI * 2 });
+  }
+  return stars;
+}
+
 function freshState(): GameState {
   return {
     phase: "idle",
     popups: [],
     particles: [],
+    stars: makeStars(),
     bullY: GROUND - BULL_SIZE,
     bullVy: 0,
     jumpsLeft: 2,
@@ -156,12 +225,19 @@ function freshState(): GameState {
     shield: 0,
     magnetT: 0,
     invulnT: 0,
+    boostT: 0,
     entities: [],
     spawnIn: 1.8,
     time: 0,
     sinceObstacle: 99,
     countdown: 3,
     flashT: 0,
+    shakeT: 0,
+    zoneBanner: "",
+    zoneBannerT: 0,
+    nearMisses: 0,
+    runFrame: 0,
+    milestones: 0,
     raf: 0,
     last: 0,
   };
@@ -190,8 +266,10 @@ export function ChargeRunner({
   const [submitted, setSubmitted] = useState(false);
   const [dailyDone, setDailyDone] = useState(false);
   const [shake, setShake] = useState(false);
+  const [liveCombo, setLiveCombo] = useState(0);
+  const [liveZone, setLiveZone] = useState<MarketZone>("warmup");
+  const [liveBoost, setLiveBoost] = useState(false);
 
-  /* HiDPI canvas */
   useEffect(() => {
     const resize = () => {
       const canvas = canvasRef.current;
@@ -250,53 +328,88 @@ export function ChargeRunner({
     const cy = e.y + e.h / 2;
     const bx = bull.x + bull.w / 2;
     const by = bull.y + bull.h / 2;
-    const pad = e.kind === "coin" || e.kind === "solbag" || e.kind === "shield" || e.kind === "magnet" ? 1.5 : 0.85;
+    const pad =
+      e.kind === "coin" || e.kind === "solbag" || e.kind === "shield" || e.kind === "magnet" || e.kind === "pump"
+        ? 1.55
+        : e.kind === "whale"
+          ? 0.75
+          : 0.82;
     const dx = Math.abs(cx - bx);
     const dy = Math.abs(cy - by);
-    return dx < (bull.w / 2 + (e.w / 2) * pad) && dy < (bull.h / 2 + (e.h / 2) * pad);
+    return dx < bull.w / 2 + (e.w / 2) * pad && dy < bull.h / 2 + (e.h / 2) * pad;
   };
 
   const drawFrame = useCallback((g: GameState, ctx: CanvasRenderingContext2D) => {
+    const zone = getZone(g.time);
+    const meta = ZONE_META[zone];
+    const shakeX = g.shakeT > 0 ? (Math.random() - 0.5) * g.shakeT * 14 : 0;
+    const shakeY = g.shakeT > 0 ? (Math.random() - 0.5) * g.shakeT * 8 : 0;
+
+    ctx.save();
+    ctx.translate(shakeX, shakeY);
+
     if (g.flashT > 0) {
       ctx.fillStyle = `rgba(255,255,255,${g.flashT * 0.35})`;
-      ctx.fillRect(0, 0, W, H);
+      ctx.fillRect(-10, -10, W + 20, H + 20);
     }
 
     const sky = ctx.createLinearGradient(0, 0, 0, H);
-    sky.addColorStop(0, "#050508");
-    sky.addColorStop(0.55, VOID);
-    sky.addColorStop(1, "#1a1220");
+    sky.addColorStop(0, meta.sky[0]);
+    sky.addColorStop(0.55, meta.sky[1]);
+    sky.addColorStop(1, meta.sky[2]);
     ctx.fillStyle = sky;
     ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = meta.tint;
+    ctx.fillRect(0, 0, W, H);
 
-    // Distant city
-    ctx.fillStyle = "rgba(212,175,55,0.05)";
-    for (let i = 0; i < 8; i++) {
-      const px = ((i * 140 - g.distance * 0.12) % (W + 140)) - 70;
-      const h = 30 + (i % 4) * 18;
-      ctx.fillRect(px, GROUND - h, 50 + (i % 3) * 20, h);
+    // Stars
+    for (const s of g.stars) {
+      const a = 0.25 + Math.sin(g.time * 3 + s.tw) * 0.2;
+      ctx.fillStyle = `rgba(242,239,233,${a * s.s})`;
+      ctx.fillRect(s.x, s.y, s.s, s.s);
     }
 
-    // Speed streaks
-    if (g.speed > 380) {
-      ctx.strokeStyle = `rgba(212,175,55,${Math.min(0.25, (g.speed - 380) / 600)})`;
+    // Moon
+    ctx.fillStyle = "rgba(237,203,106,0.12)";
+    ctx.beginPath();
+    ctx.arc(W - 120, 70, 36, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Parallax skyline
+    for (let layer = 0; layer < 3; layer++) {
+      const parallax = 0.06 + layer * 0.05;
+      const alpha = 0.04 + layer * 0.03;
+      ctx.fillStyle = `rgba(212,175,55,${alpha})`;
+      for (let i = 0; i < 10; i++) {
+        const bw = 40 + (i % 4) * 22;
+        const bh = 28 + (i % 5) * 16 + layer * 12;
+        const px = ((i * 110 - g.distance * parallax) % (W + 120)) - 60;
+        ctx.fillRect(px, GROUND - bh, bw, bh);
+        if (layer === 2 && i % 2 === 0) {
+          ctx.fillStyle = `rgba(255,220,120,${0.15 + Math.sin(g.time * 2 + i) * 0.08})`;
+          ctx.fillRect(px + 8, GROUND - bh + 10, 8, 10);
+          ctx.fillStyle = `rgba(212,175,55,${alpha})`;
+        }
+      }
+    }
+
+    if (g.speed > 340) {
+      ctx.strokeStyle = `rgba(212,175,55,${Math.min(0.3, (g.speed - 340) / 500)})`;
       ctx.lineWidth = 2;
-      for (let i = 0; i < 6; i++) {
-        const sy = 40 + i * 55;
-        const sx = (g.time * 400 + i * 130) % (W + 200) - 100;
+      for (let i = 0; i < 8; i++) {
+        const sy = 35 + i * 48;
+        const sx = (g.time * 450 + i * 110) % (W + 200) - 100;
         ctx.beginPath();
         ctx.moveTo(sx, sy);
-        ctx.lineTo(sx - 60 - g.speed * 0.05, sy);
+        ctx.lineTo(sx - 70 - g.speed * 0.06, sy);
         ctx.stroke();
       }
     }
 
-    // Ground scroll
     const gOff = (g.distance * 1.2) % 64;
     ctx.fillStyle = "rgba(212,175,55,0.07)";
-    for (let x = -gOff; x < W; x += 32) {
-      ctx.fillRect(x, GROUND + 8, 16, 4);
-    }
+    for (let x = -gOff; x < W; x += 32) ctx.fillRect(x, GROUND + 8, 16, 4);
+
     const off = (g.distance * 0.8) % 48;
     ctx.strokeStyle = "rgba(212,175,55,0.12)";
     for (let x = -off; x < W; x += 48) {
@@ -322,8 +435,10 @@ export function ChargeRunner({
     for (const e of g.entities) {
       if (e.collected) continue;
       if (e.spin) e.spin += 0.08;
+      if (e.bob !== undefined) e.bob += 0.06;
+      const bobY = e.bob !== undefined ? Math.sin(e.bob) * 6 : 0;
       const cx = e.x + e.w / 2;
-      const cy = e.y + e.h / 2;
+      const cy = e.y + e.h / 2 + bobY;
       ctx.save();
       if (e.kind === "coin") {
         ctx.translate(cx, cy);
@@ -338,10 +453,44 @@ export function ChargeRunner({
         }
       } else if (e.kind === "solbag") {
         const bag = sprites.current.solbag;
-        if (bag) ctx.drawImage(bag, e.x, e.y, e.w, e.h);
+        if (bag) ctx.drawImage(bag, e.x, e.y + bobY, e.w, e.h);
         else { ctx.font = `${e.h}px sans-serif`; ctx.textAlign = "center"; ctx.fillText("💰", cx, cy); }
+      } else if (e.kind === "dip") {
+        const body = e.h * 0.7;
+        ctx.fillStyle = CRIMSON_BRIGHT;
+        ctx.fillRect(e.x + e.w * 0.35, e.y + bobY, e.w * 0.3, body);
+        ctx.fillStyle = GREEN;
+        ctx.fillRect(e.x, e.y + bobY + body * 0.3, e.w * 0.35, body * 0.7);
+        ctx.font = "9px monospace";
+        ctx.fillStyle = BONE;
+        ctx.textAlign = "center";
+        ctx.fillText("DIP", cx, e.y + bobY - 6);
+      } else if (e.kind === "pump") {
+        ctx.translate(cx, cy + bobY);
+        ctx.rotate(g.time * 3);
+        ctx.fillStyle = GREEN;
+        ctx.fillRect(-e.w / 2, -e.h / 2, e.w, e.h * 0.6);
+        ctx.font = "18px sans-serif";
+        ctx.textAlign = "center";
+        ctx.fillText("🚀", 0, 8);
+      } else if (e.kind === "whale") {
+        ctx.fillStyle = "rgba(110,200,255,0.15)";
+        ctx.beginPath();
+        ctx.ellipse(cx, GROUND + 2, e.w * 0.6, 10, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.font = `${e.h}px sans-serif`;
+        ctx.textAlign = "center";
+        ctx.fillText("🐋", cx, cy);
+        ctx.font = "9px monospace";
+        ctx.fillStyle = "#6ec8ff";
+        ctx.fillText("WHALE", cx, e.y + bobY - 8);
+      } else if (e.kind === "flybear") {
+        ctx.translate(cx, cy + bobY);
+        ctx.rotate(Math.sin(g.time * 4) * 0.15);
+        const sp = sprites.current.beartrap;
+        if (sp) ctx.drawImage(sp, -e.w / 2, -e.h / 2, e.w, e.h);
+        else { ctx.font = `${e.h}px sans-serif`; ctx.textAlign = "center"; ctx.fillText("🐻", 0, 6); }
       } else if (e.kind === "paperhand" || e.kind === "beartrap") {
-        // Ground telegraph
         ctx.fillStyle = "rgba(255,46,46,0.18)";
         ctx.beginPath();
         ctx.ellipse(cx, GROUND + 2, e.w * 0.55, 8, 0, 0, Math.PI * 2);
@@ -350,7 +499,7 @@ export function ChargeRunner({
         if (sp) ctx.drawImage(sp, e.x, e.y, e.w, e.h);
         else { ctx.font = `${e.h}px sans-serif`; ctx.textAlign = "center"; ctx.fillText(e.kind === "paperhand" ? "🧻" : "🐻", cx, cy); }
       } else if (e.kind === "shield" || e.kind === "magnet") {
-        ctx.translate(cx, cy);
+        ctx.translate(cx, cy + bobY);
         ctx.rotate(g.time * 2);
         ctx.strokeStyle = e.kind === "shield" ? "#6ec8ff" : GOLD_BRIGHT;
         ctx.lineWidth = 2;
@@ -366,7 +515,17 @@ export function ChargeRunner({
 
     const grounded = g.bullY >= GROUND - BULL_SIZE - 0.5;
     let drawY = g.bullY;
-    if (grounded && g.phase === "running") drawY += Math.sin(g.time * 16) * 2.5;
+    if (grounded && g.phase === "running") {
+      drawY += Math.sin(g.runFrame) * 3;
+      g.runFrame += 0.35;
+    }
+
+    // Bull shadow
+    ctx.fillStyle = "rgba(0,0,0,0.35)";
+    ctx.beginPath();
+    const shadowW = BULL_SIZE * (grounded ? 0.55 : 0.35);
+    ctx.ellipse(BULL_X + BULL_SIZE / 2, GROUND + 6, shadowW, 8, 0, 0, Math.PI * 2);
+    ctx.fill();
 
     const tilt = Math.max(-0.35, Math.min(0.45, g.bullVy / 1200));
     const bullImg = sprites.current.bull;
@@ -377,6 +536,13 @@ export function ChargeRunner({
     ctx.translate(bx, by);
     ctx.rotate(tilt);
     if (g.invulnT > 0 && Math.floor(g.time * 20) % 2 === 0) ctx.globalAlpha = 0.55;
+    if (g.boostT > 0) {
+      ctx.strokeStyle = `rgba(22,199,132,${0.5 + Math.sin(g.time * 14) * 0.3})`;
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.arc(0, 0, BULL_SIZE * 0.8, 0, Math.PI * 2);
+      ctx.stroke();
+    }
     if (g.magnetT > 0) {
       ctx.strokeStyle = `rgba(237,203,106,${0.4 + Math.sin(g.time * 12) * 0.2})`;
       ctx.lineWidth = 3;
@@ -405,7 +571,7 @@ export function ChargeRunner({
       ctx.globalAlpha = Math.max(0, p.life);
       ctx.translate(p.x, p.y - (1 - p.life) * 50);
       ctx.scale(p.scale, p.scale);
-      ctx.fillStyle = GOLD_BRIGHT;
+      ctx.fillStyle = p.color ?? GOLD_BRIGHT;
       ctx.font = "900 20px Impact, sans-serif";
       ctx.strokeStyle = "#000";
       ctx.lineWidth = 3;
@@ -414,25 +580,45 @@ export function ChargeRunner({
       ctx.restore();
     }
 
-    // HUD bar
-    ctx.fillStyle = "rgba(0,0,0,0.45)";
-    ctx.fillRect(0, 0, W, 52);
+    // Zone banner
+    if (g.zoneBannerT > 0) {
+      ctx.globalAlpha = Math.min(1, g.zoneBannerT);
+      ctx.fillStyle = "rgba(0,0,0,0.55)";
+      ctx.fillRect(W / 2 - 160, H / 2 - 36, 320, 52);
+      ctx.font = "900 22px Impact, sans-serif";
+      ctx.fillStyle = zone === "bear" ? CRIMSON_BRIGHT : GOLD_BRIGHT;
+      ctx.fillText(g.zoneBanner, W / 2, H / 2);
+      ctx.globalAlpha = 1;
+    }
+
+    // HUD
+    ctx.fillStyle = "rgba(0,0,0,0.5)";
+    ctx.fillRect(0, 0, W, 56);
     ctx.textAlign = "left";
     ctx.fillStyle = BONE;
-    ctx.font = "700 16px monospace";
+    ctx.font = "700 17px monospace";
     ctx.fillText(`${calcScore(g)}`, 16, 22);
-    ctx.font = "600 11px monospace";
+    ctx.font = "600 10px monospace";
     ctx.fillStyle = "#9A95A3";
     ctx.fillText("SCORE", 16, 36);
     ctx.fillStyle = GOLD;
-    ctx.fillText(`◉ ${g.coins}`, 120, 22);
+    ctx.fillText(`◉ ${g.coins}`, 110, 22);
     ctx.fillStyle = "#9A95A3";
-    ctx.fillText(`${g.time.toFixed(1)}s`, 120, 36);
+    ctx.fillText(`${g.time.toFixed(1)}s`, 110, 36);
+    ctx.fillStyle = zone === "bear" ? CRIMSON_BRIGHT : GOLD;
+    ctx.font = "700 10px monospace";
+    ctx.fillText(meta.label, 110, 48);
+
     if (g.combo >= 2) {
+      const comboW = Math.min(120, g.comboTimer * 75);
+      ctx.fillStyle = "rgba(200,16,46,0.25)";
+      ctx.fillRect(200, 38, 120, 6);
       ctx.fillStyle = CRIMSON_BRIGHT;
+      ctx.fillRect(200, 38, comboW, 6);
       ctx.font = "900 14px Impact, sans-serif";
-      ctx.fillText(`x${Math.min(g.combo, 8)} COMBO`, 220, 28);
+      ctx.fillText(`x${Math.min(g.combo, 10)} COMBO`, 200, 28);
     }
+
     if (g.shield > 0) {
       ctx.textAlign = "right";
       ctx.fillStyle = "#6ec8ff";
@@ -443,7 +629,39 @@ export function ChargeRunner({
       ctx.fillStyle = GOLD_BRIGHT;
       ctx.fillText(`🧲${g.magnetT.toFixed(1)}s`, W - 16, 38);
     }
+    if (g.boostT > 0) {
+      ctx.fillStyle = GREEN;
+      ctx.fillText(`🚀${g.boostT.toFixed(1)}s`, W - 16, 52);
+    }
+
+    ctx.restore();
   }, []);
+
+  const banner = (g: GameState, text: string) => {
+    g.zoneBanner = text;
+    g.zoneBannerT = 2.2;
+    sfx.milestone();
+  };
+
+  const checkMilestones = (g: GameState) => {
+    const marks = [15, 30, 45, 60, 90];
+    const labels = ["DIAMOND HANDS UNLOCKED", "MEME SEASON LIVE", "BEAR MARKET INCOMING", "LEGENDARY RUN", "UNSTOPPABLE"];
+    for (let i = 0; i < marks.length; i++) {
+      const bit = 1 << i;
+      if (g.time >= marks[i] && !(g.milestones & bit)) {
+        g.milestones |= bit;
+        g.bonus += 150 * (i + 1);
+        banner(g, labels[i]);
+        burst(g, W / 2, H / 2, GOLD_BRIGHT, 14);
+      }
+    }
+    const z = getZone(g.time);
+    const zBit = z === "bull" ? 256 : z === "meme" ? 512 : z === "bear" ? 1024 : 0;
+    if (zBit && !(g.milestones & zBit)) {
+      g.milestones |= zBit;
+      banner(g, ZONE_META[z].label);
+    }
+  };
 
   const tryJump = (g: GameState) => {
     const grounded = g.bullY >= GROUND - BULL_SIZE - 1;
@@ -456,6 +674,7 @@ export function ChargeRunner({
       g.bufferT = 0;
       g.jumpCutApplied = false;
       burst(g, BULL_X + BULL_SIZE / 2, g.bullY + BULL_SIZE, "rgba(212,175,55,0.6)", 5);
+      sfx.jump();
       if (typeof navigator !== "undefined" && navigator.vibrate) navigator.vibrate(8);
       return true;
     }
@@ -464,41 +683,67 @@ export function ChargeRunner({
 
   const spawnPattern = (g: GameState) => {
     const t = g.time;
+    const zone = getZone(t);
     const r = Math.random();
     const canObstacle = g.sinceObstacle > 1.1;
+    const minGap = t < 15 ? 2.3 : t < 35 ? 1.8 : 1.4;
 
-    const minGap = t < 15 ? 2.4 : t < 35 ? 1.85 : 1.45;
     if (!canObstacle || t < WARMUP_S || g.sinceObstacle < minGap) {
       const y = GROUND - 95 - Math.random() * 50;
-      for (let i = 0; i < 3; i++) {
-        g.entities.push({ x: W + 60 + i * 42, y: y - Math.sin(i * 1.2) * 18, w: 30, h: 30, kind: "coin", spin: Math.random() * Math.PI });
+      const n = 3 + (t > 20 ? 1 : 0);
+      for (let i = 0; i < n; i++) {
+        g.entities.push({
+          x: W + 60 + i * 42,
+          y: y - Math.sin(i * 1.2) * 18,
+          w: 30,
+          h: 30,
+          kind: "coin",
+          spin: Math.random() * Math.PI,
+        });
       }
       return;
     }
 
-    const spawnX = W + 70;
+    const spawnX = W + 80;
 
-    if (r < 0.3 && canObstacle) {
-      g.entities.push({ x: spawnX, y: GROUND - 46, w: 40, h: 40, kind: "paperhand" });
+    // Choreographed gate: obstacle + coin above
+    if (r < 0.22 && canObstacle) {
+      g.entities.push({ x: spawnX, y: GROUND - 44, w: 38, h: 38, kind: "paperhand" });
+      g.entities.push({ x: spawnX + 20, y: GROUND - 145, w: 28, h: 28, kind: "coin", spin: 0 });
       g.sinceObstacle = 0;
-      if (Math.random() < 0.7) {
-        g.entities.push({ x: spawnX + 130, y: GROUND - 125, w: 28, h: 28, kind: "coin", spin: 0 });
-      }
+    } else if (r < 0.36 && canObstacle && t > 12) {
+      g.entities.push({ x: spawnX, y: GROUND - 52, w: 28, h: 70, kind: "dip", bob: 0 });
+      g.sinceObstacle = 0;
     } else if (r < 0.48 && canObstacle) {
-      g.entities.push({ x: spawnX, y: GROUND - 34, w: 46, h: 32, kind: "beartrap" });
+      g.entities.push({ x: spawnX, y: GROUND - 32, w: 44, h: 30, kind: "beartrap" });
       g.sinceObstacle = 0;
-    } else if (r < 0.78) {
-      const y = GROUND - 105 - Math.random() * 70;
-      const n = t > 25 ? 4 : 3;
+    } else if (r < 0.58 && t > 28 && canObstacle) {
+      g.entities.push({ x: spawnX, y: GROUND - 130, w: 56, h: 56, kind: "flybear", bob: Math.random() * Math.PI });
+      g.sinceObstacle = 0;
+    } else if (r < 0.68 && t > 35 && canObstacle) {
+      g.entities.push({ x: spawnX, y: GROUND - 90, w: 72, h: 72, kind: "whale", bob: 0 });
+      g.sinceObstacle = 0;
+    } else if (r < 0.82) {
+      const y = GROUND - 100 - Math.random() * 75;
+      const n = zone === "meme" ? 5 : 3;
       for (let i = 0; i < n; i++) {
-        g.entities.push({ x: spawnX + i * 40, y: y - Math.sin(i * 0.9) * 20, w: 30, h: 30, kind: "coin", spin: i * 0.5 });
+        g.entities.push({
+          x: spawnX + i * 38,
+          y: y - Math.sin(i * 0.85) * 22,
+          w: 30,
+          h: 30,
+          kind: "coin",
+          spin: i * 0.5,
+        });
       }
-    } else if (r < 0.86) {
-      g.entities.push({ x: spawnX, y: GROUND - 168, w: 36, h: 36, kind: "solbag" });
-    } else if (r < 0.93) {
-      g.entities.push({ x: spawnX, y: GROUND - 125, w: 34, h: 34, kind: "shield" });
+    } else if (r < 0.88) {
+      g.entities.push({ x: spawnX, y: GROUND - 162, w: 36, h: 36, kind: "solbag", bob: 0 });
+    } else if (r < 0.93 && zone !== "bear") {
+      g.entities.push({ x: spawnX, y: GROUND - 128, w: 34, h: 34, kind: "pump", bob: 0 });
+    } else if (r < 0.96) {
+      g.entities.push({ x: spawnX, y: GROUND - 120, w: 34, h: 34, kind: "shield" });
     } else {
-      g.entities.push({ x: spawnX, y: GROUND - 148, w: 34, h: 34, kind: "magnet" });
+      g.entities.push({ x: spawnX, y: GROUND - 140, w: 34, h: 34, kind: "magnet" });
     }
   };
 
@@ -512,9 +757,13 @@ export function ChargeRunner({
       setCoins(g.coins);
       setSubmitted(false);
       setShake(true);
+      setLiveCombo(0);
+      setLiveBoost(false);
       setTimeout(() => setShake(false), 500);
-      burst(g, BULL_X + BULL_SIZE / 2, g.bullY + BULL_SIZE / 2, CRIMSON, 16);
+      burst(g, BULL_X + BULL_SIZE / 2, g.bullY + BULL_SIZE / 2, CRIMSON_BRIGHT, 16);
       g.flashT = 0.25;
+      g.shakeT = 1;
+      sfx.hit();
       if (typeof navigator !== "undefined" && navigator.vibrate) navigator.vibrate([30, 40, 60]);
 
       const { gained } = earn("game", { score: finalScore });
@@ -543,13 +792,64 @@ export function ChargeRunner({
   const collectCoin = (g: GameState, e: Entity, mult: number) => {
     e.collected = true;
     g.coins += 1;
-    g.comboTimer = 1.6;
-    g.combo = Math.min(10, g.combo + 1);
+    g.comboTimer = 1.8;
+    g.combo = Math.min(12, g.combo + 1);
     const pts = 100 * mult;
     g.bonus += pts - 100;
-    g.popups.push({ x: e.x + e.w / 2, y: e.y, text: mult > 1 ? `+${pts}` : "+100", life: 1, scale: 1 + mult * 0.05 });
+    g.popups.push({
+      x: e.x + e.w / 2,
+      y: e.y,
+      text: mult > 1 ? `+${pts}` : "+100",
+      life: 1,
+      scale: 1 + mult * 0.05,
+    });
     burst(g, e.x + e.w / 2, e.y + e.h / 2, GOLD_BRIGHT, 6);
+    if (g.combo >= 3) sfx.combo(g.combo);
+    else sfx.coin();
     if (typeof navigator !== "undefined" && navigator.vibrate) navigator.vibrate(4);
+  };
+
+  const checkPasses = (g: GameState, bull: ReturnType<typeof hurtbox>) => {
+    for (const e of g.entities) {
+      if (e.passed || e.collected) continue;
+      if (e.x + e.w > bull.x - 8) continue;
+
+      const danger = ["paperhand", "beartrap", "whale", "flybear", "dip"].includes(e.kind);
+      if (danger && !e.nearMissed) {
+        const close =
+          Math.abs(e.y + e.h / 2 - (bull.y + bull.h / 2)) < e.h * 0.95 + 12;
+        if (close) {
+          e.nearMissed = true;
+          g.nearMisses++;
+          g.bonus += 75;
+          g.popups.push({
+            x: bull.x + bull.w / 2,
+            y: bull.y,
+            text: "CLOSE!",
+            life: 0.9,
+            scale: 1.1,
+            color: "#6ec8ff",
+          });
+          sfx.nearMiss();
+        }
+      }
+
+      if (e.kind === "dip" && !e.passed) {
+        e.passed = true;
+        g.bonus += 250;
+        g.popups.push({
+          x: e.x + e.w / 2,
+          y: e.y,
+          text: "BOUGHT THE DIP!",
+          life: 1.2,
+          scale: 1.15,
+          color: GREEN,
+        });
+        burst(g, e.x + e.w / 2, e.y + e.h / 2, GREEN, 10);
+        sfx.powerup();
+      }
+      e.passed = true;
+    }
   };
 
   const loop = useCallback(
@@ -584,28 +884,37 @@ export function ChargeRunner({
       else g.combo = 0;
       if (g.magnetT > 0) g.magnetT -= dt;
       if (g.invulnT > 0) g.invulnT -= dt;
+      if (g.boostT > 0) g.boostT -= dt;
       if (g.flashT > 0) g.flashT -= dt * 2;
+      if (g.shakeT > 0) g.shakeT -= dt * 2.5;
+      if (g.zoneBannerT > 0) g.zoneBannerT -= dt;
 
-      // Gentler ramp: crawl first 18s, then climb
+      checkMilestones(g);
+
       const ramp =
         g.time < 18 ? g.time * 5.5 : g.time < 40 ? 99 + (g.time - 18) * 6 : 231 + (g.time - 40) * 4;
-      g.speed = Math.min(MAX_SPEED, BASE_SPEED + ramp);
+      const boostSpd = g.boostT > 0 ? 80 : 0;
+      g.speed = Math.min(MAX_SPEED + boostSpd, BASE_SPEED + ramp + boostSpd);
       g.distance += g.speed * dt * 0.09;
 
-      // Jump buffer — retry each frame until window closes
       if (g.jumpBuffered) {
         g.bufferT -= dt;
         if (tryJump(g) || g.bufferT <= 0) g.jumpBuffered = false;
       }
 
+      const prevVy = g.bullVy;
       g.bullVy += GRAVITY * dt;
-
       g.bullY += g.bullVy * dt;
       const grounded = g.bullY >= GROUND - BULL_SIZE;
       if (grounded) {
         if (g.bullY > GROUND - BULL_SIZE) {
           g.bullY = GROUND - BULL_SIZE;
-          if (g.bullVy > 400) burst(g, BULL_X + BULL_SIZE / 2, GROUND, "rgba(212,175,55,0.35)", 4);
+          if (prevVy > 500) {
+            burst(g, BULL_X + BULL_SIZE / 2, GROUND, "rgba(212,175,55,0.35)", 5);
+            g.shakeT = Math.max(g.shakeT, 0.35);
+            sfx.land();
+          }
+          dustKick(g);
         }
         g.bullVy = 0;
         g.jumpsLeft = 2;
@@ -617,11 +926,12 @@ export function ChargeRunner({
       g.spawnIn -= dt;
       if (g.spawnIn <= 0) {
         spawnPattern(g);
-        g.spawnIn = Math.max(0.65, 1.5 - g.time * 0.008) * (0.75 + Math.random() * 0.45);
+        g.spawnIn = Math.max(0.6, 1.45 - g.time * 0.007) * (0.75 + Math.random() * 0.45);
       }
 
       const bull = hurtbox(g);
       const mult = Math.max(1, g.combo);
+      checkPasses(g, bull);
 
       if (g.magnetT > 0) {
         for (const e of g.entities) {
@@ -629,9 +939,9 @@ export function ChargeRunner({
           const dx = bull.x + bull.w / 2 - (e.x + e.w / 2);
           const dy = bull.y + bull.h / 2 - (e.y + e.h / 2);
           const dist = Math.hypot(dx, dy);
-          if (dist < 200 && dist > 2) {
-            e.x += (dx / dist) * 500 * dt;
-            e.y += (dy / dist) * 500 * dt;
+          if (dist < 220 && dist > 2) {
+            e.x += (dx / dist) * 520 * dt;
+            e.y += (dy / dist) * 520 * dt;
           }
         }
       }
@@ -648,14 +958,24 @@ export function ChargeRunner({
           g.bonus += 400;
           g.popups.push({ x: e.x + e.w / 2, y: e.y, text: "+500!", life: 1, scale: 1.2 });
           burst(g, e.x + e.w / 2, e.y + e.h / 2, GOLD, 10);
+          sfx.powerup();
+        } else if (e.kind === "pump") {
+          e.collected = true;
+          g.boostT = 4.5;
+          g.bonus += 200;
+          g.popups.push({ x: e.x + e.w / 2, y: e.y, text: "PUMP!", life: 1, scale: 1.2, color: GREEN });
+          burst(g, e.x + e.w / 2, e.y + e.h / 2, GREEN, 12);
+          sfx.powerup();
         } else if (e.kind === "shield") {
           e.collected = true;
           g.shield = Math.min(2, g.shield + 1);
           g.popups.push({ x: e.x + e.w / 2, y: e.y, text: "SHIELD", life: 1, scale: 1.1 });
+          sfx.powerup();
         } else if (e.kind === "magnet") {
           e.collected = true;
           g.magnetT = 5.5;
           g.popups.push({ x: e.x + e.w / 2, y: e.y, text: "MAGNET", life: 1, scale: 1.1 });
+          sfx.powerup();
         } else if (g.invulnT > 0) {
           e.collected = true;
         } else if (g.shield > 0) {
@@ -665,14 +985,22 @@ export function ChargeRunner({
           e.x = -999;
           g.popups.push({ x: bull.x, y: bull.y, text: "BLOCKED", life: 1, scale: 1 });
           burst(g, bull.x + bull.w / 2, bull.y + bull.h / 2, "#6ec8ff", 8);
+          sfx.powerup();
         } else {
-          g.deathReason = e.kind === "paperhand" ? "Paper hands got you" : "Bear trap snapped";
+          const reasons: Partial<Record<EntityKind, string>> = {
+            paperhand: "Paper hands got you",
+            beartrap: "Bear trap snapped",
+            whale: "Whale body-blocked you",
+            flybear: "Flying bear rekt you",
+            dip: "You sold the dip",
+          };
+          g.deathReason = reasons[e.kind] ?? "Rekt";
           endRun(g);
           return;
         }
       }
 
-      g.entities = g.entities.filter((e) => e.x > -100 && !e.collected);
+      g.entities = g.entities.filter((e) => e.x > -120 && !e.collected);
       for (const p of g.popups) {
         p.life -= dt * 1.2;
         p.scale = 1 + (1 - p.life) * 0.15;
@@ -685,6 +1013,10 @@ export function ChargeRunner({
         p.life -= dt * 1.8;
       }
       g.particles = g.particles.filter((p) => p.life > 0);
+
+      setLiveCombo(g.combo);
+      setLiveZone(getZone(g.time));
+      setLiveBoost(g.boostT > 0);
 
       drawFrame(g, ctx);
       g.raf = requestAnimationFrame(loop);
@@ -704,6 +1036,9 @@ export function ChargeRunner({
     setCountdownN(3);
     setScore(0);
     setHpEarned(0);
+    setLiveCombo(0);
+    setLiveZone("warmup");
+    setLiveBoost(false);
     g.raf = requestAnimationFrame(loop);
   }, [loop]);
 
@@ -772,6 +1107,8 @@ export function ChargeRunner({
     fireConfetti({ count: 90 });
   }
 
+  const zoneLabel = ZONE_META[liveZone].label;
+
   return (
     <div>
       <div
@@ -799,9 +1136,16 @@ export function ChargeRunner({
         {phase === "idle" && (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-void/80 px-4">
             <p className="font-display text-3xl uppercase tracking-widest text-gold-shimmer">Charge</p>
-            <p className="max-w-sm text-center text-sm text-ash">
-              5s warm-up · double jump · hold JUMP for big hops, release early for short ones. Space or ▲ JUMP.
+            <p className="max-w-md text-center text-sm text-ash">
+              Survive bull run → meme season → bear market. Dodge paper hands, buy the dip, grab pumps.
+              Near-miss obstacles for bonus points. Space or ▲ JUMP.
             </p>
+            <div className="flex flex-wrap justify-center gap-2 font-mono text-[10px] text-ash">
+              <span className="border border-edge px-2 py-1">🧻 Paper hands</span>
+              <span className="border border-edge px-2 py-1">📉 Buy the dip</span>
+              <span className="border border-edge px-2 py-1">🚀 Pump boost</span>
+              <span className="border border-edge px-2 py-1">🐋 Whale wall</span>
+            </div>
             <Button size="lg" onClick={beginCountdown}><Play size={18} /> Start Run</Button>
           </div>
         )}
@@ -818,7 +1162,9 @@ export function ChargeRunner({
               <p className="font-mono text-xs text-crimson-bright/80">{game.current.deathReason}</p>
             )}
             <p className="font-display text-5xl text-gold">{score.toLocaleString()}</p>
-            <p className="font-mono text-xs text-ash">{coins} coins · best {Math.max(highScore, score).toLocaleString()}</p>
+            <p className="font-mono text-xs text-ash">
+              {coins} coins · {game.current.nearMisses} near-misses · best {Math.max(highScore, score).toLocaleString()}
+            </p>
             {hpEarned > 0 && <p className="mt-1 border border-gold/50 bg-gold/10 px-4 py-1.5 font-display text-sm text-gold">+{hpEarned} HP</p>}
             <div className="mt-3 flex flex-wrap justify-center gap-2">
               <Button onClick={beginCountdown}><RotateCcw size={14} /> Again</Button>
@@ -835,9 +1181,18 @@ export function ChargeRunner({
             </div>
           </motion.div>
         )}
+
+        {(phase === "running" || phase === "paused") && (
+          <div className="pointer-events-none absolute bottom-3 left-3 right-3 flex items-center justify-between font-mono text-[10px]">
+            <span className={cn("uppercase tracking-widest", liveZone === "bear" ? "text-crimson-bright" : "text-gold")}>
+              {zoneLabel}
+            </span>
+            {liveCombo >= 2 && <span className="text-crimson-bright">x{liveCombo} combo</span>}
+            {liveBoost && <span className="text-green-400">🚀 PUMP ACTIVE</span>}
+          </div>
+        )}
       </div>
 
-      {/* Dedicated jump control — no more full-screen accidental taps */}
       <button
         type="button"
         disabled={phase === "idle" || phase === "over"}
