@@ -4,7 +4,7 @@
 > recent state before pushing.** A stale handoff is worse than none — treat
 > updating it as part of the commit, not an afterthought.
 
-Last updated: 2026-07-06 · v7 design overhaul + seeded default graphics
+Last updated: 2026-07-06 · v8 Charge feel fix (jump physics, fair spawns)
 
 ## What this is
 
@@ -73,7 +73,12 @@ route rewrites the URL to `sslmode=no-verify`. Don't remove that.
 - `components/ui/Panel.tsx` — horn-clip premium panels (gold/crimson/glass variants)
 - `components/CreatorSpotlight.tsx` — "Built by Dr Danny" hero banner + Hall of Builders (#builders)
 - `components/AchievementRoadmap.tsx` — visual HP milestones + badge progress grid
-- `components/sections/` — Forge (+ weekly Meme Battle contest banner), Charge (+ daily challenge +50 HP), Quests (daily/weekly missions, referrals, roadmap), Herd, Hands, Lore, Intel (global poll via /api/polls, local fallback)
+- `components/sections/Charge.tsx` — Arcade hub: Charge runner, Bull Tap, Hold the Line; shared stampede board
+- `components/games/ChargeRunner.tsx` — endless runner: coyote+buffer jumps, variable hop (release early), 5s coin warmup, fair obstacle gaps, dedicated JUMP button
+- `components/games/BullTap.tsx` — 30s reflex tap game
+- `components/games/HoldTheLine.tsx` — diamond-hands hold/release pressure game
+- `lib/games.ts` — per-game highs + unified leaderboard (`game` field on scores)
+- `components/sections/` — Forge (+ weekly Meme Battle contest banner), Charge (Arcade), Quests (daily/weekly missions, referrals, roadmap), Herd, Hands, Lore, Intel (global poll via /api/polls, local fallback)
 
 ## Current state (all verified on production)
 
