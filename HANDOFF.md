@@ -4,7 +4,7 @@
 > recent state before pushing.** A stale handoff is worse than none — treat
 > updating it as part of the commit, not an afterthought.
 
-Last updated: 2026-07-06 · last commit `8f56863` ("Migrate route: force sslmode=no-verify in Postgres URL")
+Last updated: 2026-07-06 · v6 engagement wave (quests, referrals, polls, creator spotlight)
 
 ## What this is
 
@@ -31,7 +31,7 @@ Data + infra:
 - **DexScreener** (no key): price/mcap/volume/24h change/buys/sells — `components/MarketProvider.tsx`, 30s poll, deepest-liquidity pair.
 - **Helius** (`HELIUS_API_KEY`): `/api/holders` (top-20 via getTokenLargestAccounts + owners) and `/api/whales` (Enhanced Transactions). Server-side only, memo-cached (120s/20s), labeled simulated fallback ONLY when Helius is unreachable — never when real data exists.
 - **Vercel Blob** store `ansem-space-assets`, public base `https://mjx5wajkb2ytnn9l.public.blob.vercel-storage.com`. Asset slots live at stable paths `slots/<id>.png` (addRandomSuffix:false, allowOverwrite:true, cacheControlMaxAge:300) so admin uploads replace live assets with no redeploy. Community meme images go to `memes/`, free library to `library/<category>/`.
-- **Supabase** (via Vercel Marketplace): tables `players`, `weekly_points`, `memes`, `meme_votes`. RLS enabled deny-all — all access goes through API routes using the service-role key (`lib/supabase-server.ts`).
+- **Supabase** (via Vercel Marketplace): tables `players`, `weekly_points`, `memes`, `meme_votes`, `polls`, `poll_votes`, `referrals`, `referral_signups`. RLS enabled deny-all — all access goes through API routes using the service-role key (`lib/supabase-server.ts`).
 
 ## Environment variables (all on Vercel, Sensitive type)
 
@@ -56,17 +56,21 @@ route rewrites the URL to `sslmode=no-verify`. Don't remove that.
 
 ## Key files
 
-- `lib/constants.ts` — CA, ticker, links, CREATOR_WALLET, shareOnX, LS keys
+- `lib/constants.ts` — CA, ticker, links, CREATOR_WALLET, CREATOR_NAME/HANDLE/TAGLINE/STORY, shareOnX (appends creator credit), LS keys
+- `lib/quests.ts` — 5 daily + 5 weekly quests, progress tracking, claim rewards, daily-challenge HP marker
+- `lib/referrals.ts` — referral codes, tiered rewards (1/3/5/10 recruits), ?ref= capture
 - `lib/palette.ts` — single source of color truth for ALL canvas renderers/logo/favicon (gold `#D4AF37`, crimson `#C8102E`; the original bright `#FFD700` was explicitly rejected — never reintroduce it)
 - `lib/bull.ts` — shared bull-mark SVG path constants + `drawBull()`
-- `lib/points.ts` — Herd Points engine: POINT_VALUES (meme 50, upvote 5, story 100, intel 20, game score÷50 max 400, daily 25+streak up to 50), badges, week keys, guest merge
+- `lib/points.ts` — Herd Points engine: POINT_VALUES (meme 50, upvote 5, story 100, intel 20, share 15, game score÷50 max 400, daily 25+streak up to 70 + milestone bonuses at 7/14/30 days), 14 badges, quest progress on PlayerData, week keys, guest merge
 - `lib/asset-manifest.ts` — 15 asset slots (branding / templates / game sprites / story) with names, descriptions, dimensions, live flags
 - `lib/admin-auth.ts` — wallet-signature auth: message `ansem-space-admin|<unix ms>`, tweetnacl verify vs CREATOR_WALLET, 10-min freshness
 - `lib/supabase-server.ts` — service-role client (server only) + wallet regex validator
-- `app/api/` — `herd` (global leaderboard GET/POST, sanity caps), `memes` (+ `memes/vote`, 23505→409 one-vote-per-voter), `assets` (admin slot/library uploads), `holders`, `whales`, `migrate`
+- `app/api/` — `herd`, `memes` (+ `memes/vote`), `polls` (global community polls), `referrals` (signup + code registration), `assets`, `holders`, `whales`, `migrate`
 - `app/admin/page.tsx` — creator-wallet-gated asset manager (slot cards + free library). No footer link — navigate to /admin directly.
-- `components/HerdProvider.tsx` — earn() + toasts, daily auto-claim, guest merge on connect, debounced (1.5s) auto-sync of connected wallets to /api/herd
-- `components/sections/` — Forge (meme generator + GLOBAL gallery), Charge (runner game), Hands (real market stats, holder Diamond Division, sell Memorial), Herd (global + local-fallback leaderboards), Lore, Intel (whale feed, buy-pressure gauge, bubble map, predictor)
+- `components/HerdProvider.tsx` — earn() + grantBonus() + toasts, quest progress on earn, daily auto-claim, guest merge, debounced Supabase sync
+- `components/CreatorSpotlight.tsx` — "Built by Dr Danny" hero banner + Hall of Builders (#builders)
+- `components/AchievementRoadmap.tsx` — visual HP milestones + badge progress grid
+- `components/sections/` — Forge (+ weekly Meme Battle contest banner), Charge (+ daily challenge +50 HP), Quests (daily/weekly missions, referrals, roadmap), Herd, Hands, Lore, Intel (global poll via /api/polls, local fallback)
 
 ## Current state (all verified on production)
 
@@ -77,9 +81,11 @@ route rewrites the URL to `sslmode=no-verify`. Don't remove that.
 
 ## Pending / next steps
 
-1. **X (Twitter) login via Supabase Auth** — the reason Supabase was chosen. Needs Danny to create an X developer app for API keys, then wire the flow.
-2. **Wire game sprites + story-card-bg into code** once Danny uploads them via /admin (slots `sprite-bull-runner`, `sprite-paperhand`, `sprite-beartrap`, `sprite-coin`, `sprite-solbag`, `story-card-bg` are marked live:false "wired on next site update").
-3. Danny to replace placeholder branding assets (og-image, favicon, logo-bull, banner-x, meme templates) with high-quality versions via /admin.
+1. **Run migration** after deploy: `POST /api/migrate` to create `polls`, `poll_votes`, `referrals`, `referral_signups` tables (seeds default airdrop poll).
+2. **X (Twitter) login via Supabase Auth** — needs X developer app API keys.
+3. **Wire game sprites + story-card-bg** once uploaded via /admin.
+4. Replace placeholder branding assets via /admin.
+5. **Phase 2 (optional):** server-trusted point events, NFT badge mints, realtime presence, governance proposals, X feed embed.
 
 ## Working rules for this project
 

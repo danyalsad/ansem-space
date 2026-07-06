@@ -1,6 +1,14 @@
 import { BullLogo } from "@/components/BullLogo";
 import { ContractAddress } from "@/components/ContractAddress";
-import { CREATOR_WALLET, LINKS, TAGLINE } from "@/lib/constants";
+import {
+  CREATOR_HANDLE,
+  CREATOR_NAME,
+  CREATOR_STORY,
+  CREATOR_TAGLINE,
+  CREATOR_WALLET,
+  LINKS,
+  TAGLINE,
+} from "@/lib/constants";
 
 export function Footer() {
   return (
@@ -69,24 +77,45 @@ export function Footer() {
           </div>
         </div>
 
-        {/* Credits */}
-        <div className="mt-12 border-t border-edge/60 pt-8">
+        {/* Creator hero banner */}
+        <div className="mt-12 border border-gold/30 bg-panel p-6 shadow-gold-glow sm:p-8">
+          <div className="flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="font-mono text-[10px] uppercase tracking-[0.35em] text-crimson">
+                Chief Builder · Hall of Builders #1
+              </p>
+              <h4 className="mt-2 font-display text-xl uppercase tracking-wide text-bone sm:text-2xl">
+                {CREATOR_NAME}
+              </h4>
+              <p className="mt-2 max-w-xl text-sm leading-relaxed text-ash">{CREATOR_STORY}</p>
+              <p className="mt-3 font-display text-xs uppercase tracking-[0.2em] text-gold">
+                {CREATOR_TAGLINE}
+              </p>
+            </div>
+            <div className="flex shrink-0 flex-col gap-3">
+              <a
+                href={LINKS.creatorX}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center justify-center gap-2 border border-gold/50 bg-gold/10 px-5 py-3 font-display text-xs uppercase tracking-wider text-gold transition-all hover:border-gold hover:shadow-gold-glow"
+              >
+                𝕏 {CREATOR_HANDLE}
+              </a>
+              <span className="text-center font-mono text-[10px] text-ash">
+                {CREATOR_WALLET.slice(0, 8)}…{CREATOR_WALLET.slice(-6)}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-8 border-t border-edge/60 pt-8">
           <h4 className="font-display text-xs uppercase tracking-[0.3em] text-gold">Credits</h4>
           <div className="mt-4 flex flex-col gap-2.5 text-xs text-ash">
             <span>
               Built for the <span className="text-gold">$ANSEM</span> community 🐂
             </span>
-            <span className="font-mono">
-              Creator: <span className="break-all text-bone">{CREATOR_WALLET}</span>{" "}
-              <span className="text-gold">(Solana)</span>
-            </span>
-            <a
-              href={LINKS.creatorX}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="font-mono text-gold transition-colors hover:text-gold-glow"
-            >
-              𝕏 @DannyMD_UK
+            <a href="#builders" className="font-mono text-gold transition-colors hover:text-gold-glow">
+              Hall of Builders →
             </a>
           </div>
         </div>

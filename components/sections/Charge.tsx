@@ -18,6 +18,7 @@ import { drawBull } from "@/lib/bull";
 import { LS, shareOnX } from "@/lib/constants";
 import { BONE, CRIMSON_BRIGHT, GOLD, GOLD_BRIGHT, VOID } from "@/lib/palette";
 import { fireConfetti } from "@/lib/confetti";
+import { claimDailyChallenge } from "@/lib/quests";
 import { cn, shortAddress, store } from "@/lib/utils";
 
 /* ---------------- game model ---------------- */
@@ -99,7 +100,7 @@ export function Charge() {
   });
 
   const { address, connect } = useWallet();
-  const { earn } = useHerd();
+  const { earn, grantBonus } = useHerd();
   const [phase, setPhase] = useState<Phase>("idle");
   const [score, setScore] = useState(0);
   const [coins, setCoins] = useState(0);
@@ -229,18 +230,20 @@ export function Charge() {
         fireConfetti({ count: 140 });
       }
 
-      // Daily challenge check
+      // Daily challenge check — +50 HP bonus on first completion today
       const d = daily.current;
       if (d.check({ coins: g.coins, score: finalScore, time: g.time })) {
         const done = store.get<string[]>(LS.daily, []);
         if (!done.includes(d.id)) {
           store.set(LS.daily, [...done, d.id]);
           setDailyDone(true);
+          const bonus = claimDailyChallenge(address);
+          if (bonus) grantBonus(bonus.gained, bonus.label);
           fireConfetti({ count: 100 });
         }
       }
     },
-    [earn]
+    [address, earn, grantBonus]
   );
 
   const loop = useCallback(

@@ -5,7 +5,7 @@ import { ArrowRight, Flame, Gamepad2 } from "lucide-react";
 import { BullLogo } from "@/components/BullLogo";
 import { ContractAddress } from "@/components/ContractAddress";
 import { Button } from "@/components/ui/button";
-import { LINKS, TAGLINE } from "@/lib/constants";
+import { CREATOR_HANDLE, CREATOR_NAME, CREATOR_TAGLINE, LINKS, TAGLINE } from "@/lib/constants";
 
 const TICKER_WORDS = [
   "THE BLACK BULL",
@@ -72,9 +72,24 @@ export function Hero() {
 
           <motion.p variants={item} className="mt-4 max-w-xl text-sm leading-relaxed text-ash">
             The central hub for the <span className="text-gold">$ANSEM</span> community — meme
-            forge, endless-runner arcade, diamond-hands culture, full lore archive and live
-            on-chain intel. Built by the herd, for the herd.
+            forge, endless-runner arcade, daily quests, diamond-hands culture, full lore archive
+            and live on-chain intel.
           </motion.p>
+
+          <motion.a
+            variants={item}
+            href="#builders"
+            className="mt-5 inline-flex max-w-xl items-center gap-3 border border-gold/30 bg-gold/5 px-4 py-3 transition-all hover:border-gold/60 hover:shadow-gold-glow"
+          >
+            <span className="text-lg">🐂</span>
+            <span className="text-left">
+              <span className="block font-display text-[10px] uppercase tracking-[0.25em] text-crimson">
+                Built by {CREATOR_NAME}
+              </span>
+              <span className="block font-mono text-xs text-gold">{CREATOR_TAGLINE}</span>
+              <span className="block font-mono text-[10px] text-ash">𝕏 {CREATOR_HANDLE} · Hall of Builders →</span>
+            </span>
+          </motion.a>
 
           <motion.div variants={item} className="mt-8">
             <ContractAddress full className="max-w-full" />

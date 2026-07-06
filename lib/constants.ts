@@ -16,13 +16,18 @@ export const LINKS = {
 
 /** Site creator — connects to unlock the admin asset manager at /admin. */
 export const CREATOR_WALLET = "3bdYdaDkjvKDST9zzjAZRpsodpd7DpU618QgMdpwtfWM";
+export const CREATOR_NAME = "Dr Danny";
+export const CREATOR_HANDLE = "@DannyMD_UK";
+export const CREATOR_TAGLINE = "Made with ❤️ by Dr Danny for the Herd";
+export const CREATOR_STORY =
+  "Physician, builder, and bull of the herd. Dr Danny forged ANSEM Space from scratch — meme lab, arcade, global leaderboard, live intel — so every holder has a home worth charging into.";
 
 export const HASHTAGS = "#ANSEM #Solana #TheBlackBull";
 
 /** Open an X (Twitter) compose window pre-filled with $ANSEM share text. */
 export function shareOnX(text: string) {
   const url = `https://twitter.com/intent/tweet?text=${encodeURIComponent(
-    `${text}\n\n${HASHTAGS}\n${SITE_URL}`
+    `${text}\n\n${HASHTAGS}\n${SITE_URL}\n\n— ${CREATOR_TAGLINE} · ${CREATOR_HANDLE}`
   )}`;
   window.open(url, "_blank", "noopener,noreferrer,width=600,height=650");
 }
@@ -37,4 +42,6 @@ export const LS = {
   daily: "ansem_daily",
   prediction: "ansem_prediction",
   storyName: "ansem_story_name",
+  referrals: "ansem_referrals",
+  referralClaimed: "ansem_referral_claimed",
 } as const;

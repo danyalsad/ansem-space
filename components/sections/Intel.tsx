@@ -15,6 +15,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { Activity, Radar, Waves } from "lucide-react";
 import { SectionHeader } from "@/components/SectionHeader";
 import { useHerd } from "@/components/HerdProvider";
+import { useWallet } from "@/components/WalletProvider";
 import { useMarket } from "@/components/MarketProvider";
 import { LS } from "@/lib/constants";
 import { fireConfetti } from "@/lib/confetti";
@@ -323,56 +324,118 @@ const PREDICTION_OPTIONS = [
 
 function AirdropPredictor() {
   const { earn } = useHerd();
-  const [choice, setChoice] = useState<string | null>(null);
+  const { address } = useWallet();
+  const [choice, setChoice] = useState<number | null>(null);
+  const [poll, setPoll] = useState<{
+    id: string;
+    question: string;
+    options: string[];
+    counts: number[];
+    total: number;
+  } | null>(null);
+  const [source, setSource] = useState<"live" | "local">("local");
 
   useEffect(() => {
-    setChoice(store.get<string | null>(LS.prediction, null));
+    fetch("/api/polls")
+      .then((r) => r.json())
+      .then((j) => {
+        if (j.polls?.[0]) {
+          setPoll(j.polls[0]);
+          setSource("live");
+        }
+      })
+      .catch(() => {});
+    const local = store.get<number | null>(LS.prediction, null);
+    if (local !== null) setChoice(local);
   }, []);
 
-  function vote(id: string) {
-    if (choice) return;
-    setChoice(id);
-    store.set(LS.prediction, id);
-    earn("intel"); // +20 HP — unlocks the Oracle badge
+  async function vote(idx: number) {
+    if (choice !== null) return;
+    const voter = address ?? store.get<string>("ansem_voter_id", `guest-${Date.now()}`);
+
+    if (poll && source === "live") {
+      const res = await fetch("/api/polls", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pollId: poll.id, voter, optionIdx: idx }),
+      }).catch(() => null);
+      if (res?.ok) {
+        setChoice(idx);
+        setPoll((p) =>
+          p
+            ? { ...p, counts: p.counts.map((c, i) => (i === idx ? c + 1 : c)), total: p.total + 1 }
+            : p
+        );
+        earn("intel");
+        fireConfetti({ count: 60 });
+        return;
+      }
+      if (res?.status === 409) {
+        setChoice(idx);
+        return;
+      }
+    }
+
+    setChoice(idx);
+    store.set(LS.prediction, idx);
+    earn("intel");
     fireConfetti({ count: 60 });
   }
+
+  const options = poll?.options ?? PREDICTION_OPTIONS.map((o) => o.label);
+  const counts = poll?.counts ?? options.map(() => 0);
+  const total = poll?.total ?? counts.reduce((a, b) => a + b, 0);
 
   return (
     <div className="border border-gold/30 bg-panel p-5 shadow-panel [clip-path:polygon(12px_0,100%_0,100%_calc(100%-12px),calc(100%-12px)_100%,0_100%,0_12px)]">
       <h3 className="font-display text-sm uppercase tracking-widest text-gold">
-        🪂 Next Airdrop Predictor
+        🪂 {poll?.question ?? "Next Airdrop Predictor"}
       </h3>
       <p className="mt-1 font-mono text-[10px] text-ash">
-        When does the legend rain on the herd again? Cast your prophecy — worth +20 HP.
+        Community poll — cast your prophecy for +20 HP.{" "}
+        {source === "live" ? (
+          <span className="text-gold">Live · global votes</span>
+        ) : (
+          "Local fallback until migration runs."
+        )}
       </p>
       <div className="mt-4 space-y-2.5">
-        {PREDICTION_OPTIONS.map((o) => {
-          const mine = choice === o.id;
+        {options.map((label, idx) => {
+          const mine = choice === idx;
+          const pct = total > 0 ? Math.round((counts[idx] / total) * 100) : 0;
           return (
             <button
-              key={o.id}
-              onClick={() => vote(o.id)}
-              disabled={!!choice}
+              key={label}
+              onClick={() => vote(idx)}
+              disabled={choice !== null}
               className={cn(
                 "relative w-full overflow-hidden border px-4 py-3 text-left transition-all",
                 mine ? "border-gold bg-gold/10" : "border-edge",
-                !choice && "hover:border-gold/60"
+                choice === null && "hover:border-gold/60"
               )}
             >
+              {total > 0 && (
+                <div
+                  className="absolute inset-y-0 left-0 bg-gold/10 transition-all"
+                  style={{ width: `${pct}%` }}
+                />
+              )}
               <span className="relative flex items-center justify-between gap-2 text-sm">
                 <span className={mine ? "text-gold" : "text-bone"}>
-                  {o.label} {mine && "✓"}
+                  {label} {mine && "✓"}
                 </span>
-                {mine && <span className="font-mono text-xs text-gold">your prophecy</span>}
+                {total > 0 && (
+                  <span className="font-mono text-xs text-ash">{pct}%</span>
+                )}
               </span>
             </button>
           );
         })}
       </div>
       <p className="mt-3 font-mono text-[10px] text-ash">
-        {choice
-          ? "Prophecy recorded on this device. The herd remembers."
-          : "One vote per bull. Stored locally."}
+        {choice !== null
+          ? `Prophecy recorded${source === "live" ? " globally" : " on this device"}. The herd remembers.`
+          : "One vote per bull."}
       </p>
     </div>
   );

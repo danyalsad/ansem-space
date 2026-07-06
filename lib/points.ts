@@ -9,7 +9,7 @@
 
 import { store } from "@/lib/utils";
 
-export type EarnAction = "game" | "meme_post" | "upvote" | "story" | "daily" | "intel";
+export type EarnAction = "game" | "meme_post" | "upvote" | "story" | "daily" | "intel" | "share";
 
 export interface PlayerCounters {
   games: number;
@@ -19,6 +19,15 @@ export interface PlayerCounters {
   story: number;
   intel: number;
   dailies: number;
+  questsClaimed: number;
+  referrals: number;
+  shares: number;
+}
+
+export interface QuestProgress {
+  count: number;
+  claimed: boolean;
+  periodKey: string;
 }
 
 export interface PlayerData {
@@ -29,6 +38,7 @@ export interface PlayerData {
   streak: number;
   lastDaily: string; // yyyy-mm-dd of last daily bonus
   counters: PlayerCounters;
+  quests?: Record<string, QuestProgress>;
 }
 
 export interface Badge {
@@ -48,6 +58,12 @@ export const BADGES: Badge[] = [
   { id: "herd-voice", name: "Voice of the Herd", emoji: "📢", desc: "Upvote 10 community memes", earned: (d) => d.counters.upvotes >= 10 },
   { id: "oracle", name: "Oracle", emoji: "🔮", desc: "Use the Intel prediction tools", earned: (d) => d.counters.intel >= 1 },
   { id: "grinder", name: "Certified Grinder", emoji: "⚒️", desc: "Reach 1,000 total Herd Points", earned: (d) => d.total >= 1000 },
+  { id: "streak-warrior", name: "Streak Warrior", emoji: "🔥", desc: "7-day login streak", earned: (d) => d.streak >= 7 },
+  { id: "quest-master", name: "Quest Master", emoji: "🎯", desc: "Claim 10 quest rewards", earned: (d) => (d.counters.questsClaimed ?? 0) >= 10 },
+  { id: "herd-recruiter", name: "Herd Recruiter", emoji: "📣", desc: "Recruit 3 friends via referral", earned: (d) => (d.counters.referrals ?? 0) >= 3 },
+  { id: "bull-legend", name: "Bull Legend", emoji: "🐂", desc: "Reach 5,000 total Herd Points", earned: (d) => d.total >= 5000 },
+  { id: "meme-champion", name: "Meme Champion", emoji: "🏆", desc: "Post 10 memes to the gallery", earned: (d) => d.counters.memes >= 10 },
+  { id: "share-bull", name: "Bullhorn", emoji: "📯", desc: "Share 5 creations on X", earned: (d) => (d.counters.shares ?? 0) >= 5 },
 ];
 
 /** Fixed point values (game points are score-derived). */
@@ -56,6 +72,7 @@ export const POINT_VALUES: Record<Exclude<EarnAction, "game" | "daily">, number>
   upvote: 5,
   story: 100,
   intel: 20,
+  share: 15,
 };
 
 const EMPTY: PlayerData = {
@@ -64,7 +81,18 @@ const EMPTY: PlayerData = {
   badges: [],
   streak: 0,
   lastDaily: "",
-  counters: { games: 0, bestScore: 0, memes: 0, upvotes: 0, story: 0, intel: 0, dailies: 0 },
+  counters: {
+    games: 0,
+    bestScore: 0,
+    memes: 0,
+    upvotes: 0,
+    story: 0,
+    intel: 0,
+    dailies: 0,
+    questsClaimed: 0,
+    referrals: 0,
+    shares: 0,
+  },
 };
 
 export function playerKey(address: string | null): string {
@@ -87,8 +115,12 @@ export function loadPlayer(address: string | null): PlayerData {
   return { ...structuredClone(EMPTY), ...raw, counters: { ...EMPTY.counters, ...raw.counters } };
 }
 
-function savePlayer(address: string | null, data: PlayerData) {
+export function savePlayerDirect(address: string | null, data: PlayerData) {
   store.set(playerKey(address), data);
+}
+
+function savePlayer(address: string | null, data: PlayerData) {
+  savePlayerDirect(address, data);
 }
 
 export interface EarnResult {
@@ -142,13 +174,22 @@ export function awardPoints(
       data.counters.intel += 1;
       label = "Intel used";
       break;
+    case "share":
+      gained = POINT_VALUES.share;
+      data.counters.shares = (data.counters.shares ?? 0) + 1;
+      label = "Shared on X";
+      break;
     case "daily": {
       if (data.lastDaily === today) return { gained: 0, newBadges: [], data, label: "" };
       const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
       data.streak = data.lastDaily === yesterday ? data.streak + 1 : 1;
       data.lastDaily = today;
       data.counters.dailies += 1;
-      gained = 25 + Math.min(data.streak - 1, 5) * 5; // 25 → 50 with streak
+      gained = 25 + Math.min(data.streak - 1, 9) * 5; // 25 → 70 with 10+ day streak
+      // Streak milestone bonuses at 7, 14, 30 days
+      if (data.streak === 7) gained += 100;
+      else if (data.streak === 14) gained += 200;
+      else if (data.streak === 30) gained += 500;
       label = `Daily bonus · day ${data.streak}`;
       break;
     }

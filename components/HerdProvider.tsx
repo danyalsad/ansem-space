@@ -20,15 +20,18 @@ import { AnimatePresence, motion } from "framer-motion";
 import { useWallet } from "@/components/WalletProvider";
 import {
   awardPoints,
+  BADGES,
   computeRank,
   listLocalPlayers,
   loadPlayer,
   mergeGuestInto,
+  savePlayerDirect,
   weekKey,
   type Badge,
   type EarnAction,
   type PlayerData,
 } from "@/lib/points";
+import { trackQuestAction, type QuestTrigger } from "@/lib/quests";
 import { fireConfetti } from "@/lib/confetti";
 import { shortAddress } from "@/lib/utils";
 
@@ -44,6 +47,7 @@ interface HerdState {
   rank: number;
   weeklyRank: number;
   earn: (action: EarnAction, meta?: { score?: number }) => { gained: number; newBadges: Badge[] };
+  grantBonus: (amount: number, label: string) => void;
 }
 
 const HerdContext = createContext<HerdState | null>(null);
@@ -61,16 +65,42 @@ export function HerdProvider({ children }: { children: ReactNode }) {
     setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), kind === "badge" ? 5200 : 3200);
   }, []);
 
+  const grantBonus = useCallback(
+    (amount: number, label: string) => {
+      const d = loadPlayer(address);
+      d.total += amount;
+      const wk = weekKey();
+      d.weekly[wk] = (d.weekly[wk] ?? 0) + amount;
+      savePlayerDirect(address, d);
+      setData(d);
+      if (amount > 0) pushToast(`+${amount} HP · ${label}`);
+    },
+    [address, pushToast]
+  );
+
   const earn = useCallback(
     (action: EarnAction, meta: { score?: number } = {}) => {
       const result = awardPoints(address, action, meta);
-      setData(result.data);
+      if (["game", "meme_post", "upvote", "intel", "share", "daily"].includes(action)) {
+        trackQuestAction(address, action as QuestTrigger);
+      }
+      let fresh = loadPlayer(address);
+      const extraBadges = BADGES.filter((b) => !fresh.badges.includes(b.id) && b.earned(fresh));
+      if (extraBadges.length) {
+        fresh.badges.push(...extraBadges.map((b) => b.id));
+        savePlayerDirect(address, fresh);
+      }
+      setData(fresh);
+      const allNewBadges = [
+        ...result.newBadges,
+        ...extraBadges.filter((b) => !result.newBadges.some((x) => x.id === b.id)),
+      ];
       if (result.gained > 0) pushToast(`+${result.gained} HP · ${result.label}`);
-      for (const badge of result.newBadges) {
+      for (const badge of allNewBadges) {
         pushToast(`Badge unlocked: ${badge.emoji} ${badge.name}`, "badge");
       }
-      if (result.newBadges.length > 0) fireConfetti({ count: 110 });
-      return { gained: result.gained, newBadges: result.newBadges };
+      if (allNewBadges.length > 0) fireConfetti({ count: 110 });
+      return { gained: result.gained, newBadges: allNewBadges };
     },
     [address, pushToast]
   );
@@ -120,6 +150,7 @@ export function HerdProvider({ children }: { children: ReactNode }) {
         rank: computeRank(players, data.total, "total"),
         weeklyRank: computeRank(players, weeklyPoints, "weekly"),
         earn,
+        grantBonus,
       }}
     >
       {children}

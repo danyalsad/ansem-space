@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { useHerd } from "@/components/HerdProvider";
 import { useMarket } from "@/components/MarketProvider";
 import { useWallet } from "@/components/WalletProvider";
-import { LINKS } from "@/lib/constants";
+import { CREATOR_HANDLE, CREATOR_NAME, CREATOR_TAGLINE, LINKS } from "@/lib/constants";
 import { BADGES } from "@/lib/points";
 import { triggerBullCharge } from "@/lib/confetti";
 import { cn, shortAddress } from "@/lib/utils";
@@ -16,6 +16,7 @@ import { cn, shortAddress } from "@/lib/utils";
 const NAV_LINKS = [
   { href: "#forge", label: "Forge" },
   { href: "#charge", label: "Charge" },
+  { href: "#quests", label: "Quests" },
   { href: "#herd", label: "Herd" },
   { href: "#hands", label: "Hands" },
   { href: "#lore", label: "Lore" },
@@ -231,10 +232,17 @@ export function Navbar() {
             href={LINKS.creatorX}
             target="_blank"
             rel="noopener noreferrer"
-            title="Site creator"
-            className="ml-2 border-l border-edge py-1 pl-3 font-mono text-[10px] text-ash/70 transition-colors hover:text-gold"
+            title={`${CREATOR_NAME} — Chief Builder`}
+            className="ml-2 hidden items-center gap-1.5 border-l border-edge py-1 pl-3 font-mono text-[10px] text-ash/80 transition-colors hover:text-gold xl:flex"
           >
-            by @DannyMD_UK
+            <span className="text-crimson">❤</span>
+            <span className="text-gold/90">{CREATOR_TAGLINE}</span>
+          </a>
+          <a
+            href="#builders"
+            className="hidden font-mono text-[9px] uppercase tracking-widest text-ash/60 transition-colors hover:text-gold lg:inline"
+          >
+            {CREATOR_NAME}
           </a>
         </nav>
 
@@ -281,7 +289,7 @@ export function Navbar() {
                 onClick={() => setMenuOpen(false)}
                 className="pt-4 font-mono text-[11px] text-ash transition-colors hover:text-gold"
               >
-                Built by 𝕏 @DannyMD_UK for the $ANSEM community
+                {CREATOR_TAGLINE} · 𝕏 {CREATOR_HANDLE}
               </a>
             </div>
           </motion.nav>

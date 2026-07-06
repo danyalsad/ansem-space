@@ -1,7 +1,9 @@
 import { Navbar } from "@/components/Navbar";
 import { Hero } from "@/components/Hero";
+import { CreatorSpotlight } from "@/components/CreatorSpotlight";
 import { Forge } from "@/components/sections/Forge";
 import { Charge } from "@/components/sections/Charge";
+import { Quests } from "@/components/sections/Quests";
 import { Herd } from "@/components/sections/Herd";
 import { Hands } from "@/components/sections/Hands";
 import { Lore } from "@/components/sections/Lore";
@@ -14,8 +16,10 @@ export default function Home() {
     <main className="relative">
       <Navbar />
       <Hero />
+      <CreatorSpotlight />
       <Forge />
       <Charge />
+      <Quests />
       <Herd />
       <Hands />
       <Lore />

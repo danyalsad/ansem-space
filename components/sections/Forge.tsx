@@ -25,7 +25,8 @@ import { useHerd } from "@/components/HerdProvider";
 import { useWallet } from "@/components/WalletProvider";
 import { fileToDataUrl, listAssets, saveAsset, type SiteAsset } from "@/lib/assets";
 import { drawBull } from "@/lib/bull";
-import { LS, shareOnX } from "@/lib/constants";
+import { CREATOR_HANDLE, CREATOR_TAGLINE, LS, shareOnX } from "@/lib/constants";
+import { weekKey } from "@/lib/points";
 import { fireConfetti } from "@/lib/confetti";
 import { cn, shortAddress, store } from "@/lib/utils";
 
@@ -595,6 +596,7 @@ export function Forge() {
     // X intent can't attach images — download it, then open the pre-filled compose.
     download();
     shareOnX(`Just forged this in the ANSEM Space Meme Lab 🐂🔥 ${topText} ${bottomText}`.trim());
+    earn("share");
   }
 
   function saveToGallery() {
@@ -605,6 +607,7 @@ export function Forge() {
   }
 
   const sorted = [...memes].sort((a, b) => (sort === "top" ? b.votes - a.votes : b.ts - a.ts));
+  const battleLeaders = [...memes].sort((a, b) => b.votes - a.votes).slice(0, 3);
 
   /* ---------------- render ---------------- */
 
@@ -620,6 +623,40 @@ export function Forge() {
           title="The Forge"
           sub="Weapons-grade meme production. Pick a Black Bull template, stamp your words on it, drop your own sticker, and unleash it on the timeline."
         />
+
+        {/* Weekly meme battle */}
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          className="mb-8 border border-crimson/40 bg-gradient-to-r from-crimson/10 via-panel to-gold/10 p-5"
+        >
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <p className="font-mono text-[10px] uppercase tracking-[0.35em] text-crimson">
+                Meme Battle · {weekKey()}
+              </p>
+              <h3 className="mt-1 font-display text-lg uppercase tracking-wide text-gold">
+                🏆 Community Meme Contest
+              </h3>
+              <p className="mt-1 text-xs text-ash">
+                Post memes, rally votes — top meme of the week earns the Meme Champion badge track.
+              </p>
+              <p className="mt-2 font-mono text-[9px] text-gold/70">{CREATOR_TAGLINE} · {CREATOR_HANDLE}</p>
+            </div>
+            {battleLeaders.length > 0 && (
+              <div className="flex gap-3">
+                {battleLeaders.map((m, i) => (
+                  <div key={m.id} className="text-center">
+                    <span className="text-lg">{i === 0 ? "🥇" : i === 1 ? "🥈" : "🥉"}</span>
+                    <p className="mt-1 max-w-[100px] truncate font-mono text-[9px] text-bone">{m.caption}</p>
+                    <p className="font-mono text-[9px] text-gold">{m.votes} votes</p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </motion.div>
 
         <div className="grid gap-8 lg:grid-cols-[1fr_400px]">
           {/* Canvas preview */}
@@ -893,7 +930,10 @@ export function Forge() {
                       <ThumbsUp size={12} /> {meme.votes}
                     </button>
                     <button
-                      onClick={() => shareOnX(`"${meme.caption}" — via the ANSEM Space community gallery 🐂`)}
+                      onClick={() => {
+                        shareOnX(`"${meme.caption}" — via the ANSEM Space community gallery 🐂`);
+                        earn("share");
+                      }}
                       className="p-1.5 text-ash transition-colors hover:text-gold"
                       title="Share to X"
                     >

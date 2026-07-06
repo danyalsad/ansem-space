@@ -18,12 +18,15 @@ import { BADGES, listLocalPlayers, weekKey, type HerdEntry } from "@/lib/points"
 import { cn, shortAddress } from "@/lib/utils";
 
 const EARN_METHODS = [
+  { emoji: "🎯", label: "Complete daily & weekly quests", detail: "up to +300 HP per quest" },
   { emoji: "🎮", label: "Play Charge", detail: "score ÷ 50 HP per run (max 400)" },
   { emoji: "🔥", label: "Post a meme to the gallery", detail: "+50 HP" },
   { emoji: "👍", label: "Upvote community memes", detail: "+5 HP each" },
   { emoji: "📜", label: "Complete Story Mode in Lore", detail: "+100 HP first time" },
-  { emoji: "📅", label: "Daily login bonus", detail: "+25 HP, up to +50 with streak" },
+  { emoji: "📅", label: "Daily login bonus", detail: "+25 HP, escalating streak milestones" },
   { emoji: "🔮", label: "Cast an Intel prediction", detail: "+20 HP" },
+  { emoji: "𝕏", label: "Share on X", detail: "+15 HP · counts toward Bullhorn badge" },
+  { emoji: "📣", label: "Refer friends", detail: "tiered bonuses up to +1,000 HP" },
 ];
 
 export function Herd() {

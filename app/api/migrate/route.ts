@@ -50,8 +50,51 @@ alter table weekly_points enable row level security;
 alter table memes enable row level security;
 alter table meme_votes enable row level security;
 
+create table if not exists polls (
+  id         uuid primary key default gen_random_uuid(),
+  question   text not null,
+  options    text[] not null,
+  active     boolean not null default true,
+  ends_at    timestamptz,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists poll_votes (
+  poll_id     uuid not null references polls(id) on delete cascade,
+  voter       text not null,
+  option_idx  integer not null,
+  created_at  timestamptz not null default now(),
+  primary key (poll_id, voter)
+);
+
+create table if not exists referrals (
+  wallet     text primary key,
+  code       text not null unique,
+  recruits   integer not null default 0,
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists referral_signups (
+  referee         text primary key,
+  referrer_wallet text not null,
+  referrer_code   text not null,
+  created_at      timestamptz not null default now()
+);
+
+alter table polls enable row level security;
+alter table poll_votes enable row level security;
+alter table referrals enable row level security;
+alter table referral_signups enable row level security;
+
 create index if not exists memes_created_idx on memes (created_at desc);
 create index if not exists weekly_points_week_idx on weekly_points (week_key, points desc);
+create index if not exists poll_votes_poll_idx on poll_votes (poll_id);
+create index if not exists referrals_code_idx on referrals (code);
+
+-- Seed the default community poll if none exists
+insert into polls (question, options, active)
+select 'Next airdrop this week?', array['This week', 'This month', 'On a full moon 🌕', 'Never — cooking something bigger'], true
+where not exists (select 1 from polls limit 1);
 `;
 
 export async function POST(req: Request) {
