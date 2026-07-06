@@ -1,7 +1,6 @@
 import { BullLogo } from "@/components/BullLogo";
 import { ContractAddress } from "@/components/ContractAddress";
 import { CREATOR_WALLET, LINKS, TAGLINE } from "@/lib/constants";
-import { shortAddress } from "@/lib/utils";
 
 export function Footer() {
   return (
@@ -73,12 +72,13 @@ export function Footer() {
         {/* Credits */}
         <div className="mt-12 border-t border-edge/60 pt-8">
           <h4 className="font-display text-xs uppercase tracking-[0.3em] text-gold">Credits</h4>
-          <div className="mt-4 flex flex-col gap-2 text-xs text-ash sm:flex-row sm:items-center sm:gap-6">
+          <div className="mt-4 flex flex-col gap-2.5 text-xs text-ash">
             <span>
               Built for the <span className="text-gold">$ANSEM</span> community 🐂
             </span>
-            <span className="font-mono" title={CREATOR_WALLET}>
-              Creator: <span className="text-bone">{shortAddress(CREATOR_WALLET, 6)}</span>
+            <span className="font-mono">
+              Creator: <span className="break-all text-bone">{CREATOR_WALLET}</span>{" "}
+              <span className="text-gold">(Solana)</span>
             </span>
             <a
               href={LINKS.creatorX}
