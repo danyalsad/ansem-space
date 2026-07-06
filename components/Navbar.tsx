@@ -15,7 +15,7 @@ import { cn, shortAddress } from "@/lib/utils";
 
 const NAV_LINKS = [
   { href: "#forge", label: "Forge" },
-  { href: "#charge", label: "Charge" },
+  { href: "#charge", label: "Arcade" },
   { href: "#quests", label: "Quests" },
   { href: "#herd", label: "Herd" },
   { href: "#hands", label: "Hands" },

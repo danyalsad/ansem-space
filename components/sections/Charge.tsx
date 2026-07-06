@@ -1,642 +1,129 @@
 "use client";
 
 /**
- * SECTION 2 — CHARGE (The Game)
- * Endless runner on HTML canvas: the Black Bull jumps paperhands and bear
- * traps, collects $ANSEM coins and SOL bags. Space / tap to jump (double
- * jump supported). High score + submitted scores live in localStorage.
+ * SECTION — ARCADE (Charge + Bull Tap + Hold the Line)
+ * Three mini-games, one HP pipeline. Tab between games; shared stampede board.
  */
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { Pause, Play, RotateCcw, Share2, Trophy } from "lucide-react";
+import { Gamepad2, Gem, Trophy, Zap } from "lucide-react";
 import { SectionHeader } from "@/components/SectionHeader";
-import { Button } from "@/components/ui/button";
+import { ChargeRunner } from "@/components/games/ChargeRunner";
+import { BullTap } from "@/components/games/BullTap";
+import { HoldTheLine } from "@/components/games/HoldTheLine";
+import { loadHighs, loadLeaderboard, GAME_LABELS, type ArcadeGame, type ArcadeScore } from "@/lib/games";
 import { useWallet } from "@/components/WalletProvider";
-import { useHerd } from "@/components/HerdProvider";
-import { drawBull } from "@/lib/bull";
-import { slotUrl } from "@/lib/asset-manifest";
-import { LS, shareOnX } from "@/lib/constants";
-import { BONE, CRIMSON_BRIGHT, GOLD, GOLD_BRIGHT, VOID } from "@/lib/palette";
-import { fireConfetti } from "@/lib/confetti";
-import { claimDailyChallenge } from "@/lib/quests";
-import { cn, shortAddress, store } from "@/lib/utils";
+import { cn, shortAddress } from "@/lib/utils";
 
-/* ---------------- game model ---------------- */
-
-type Phase = "idle" | "running" | "paused" | "over";
-
-interface Entity {
-  x: number;
-  y: number;
-  w: number;
-  h: number;
-  kind: "paperhand" | "beartrap" | "coin" | "solbag";
-  collected?: boolean;
-}
-
-/** Floating "+100" style feedback text. */
-interface Popup {
-  x: number;
-  y: number;
-  text: string;
-  life: number; // 1 → 0
-}
-
-interface GameState {
-  popups: Popup[];
-  phase: Phase;
-  bullY: number;
-  bullVy: number;
-  jumpsLeft: number;
-  speed: number;
-  distance: number;
-  coins: number;
-  entities: Entity[];
-  spawnIn: number;
-  time: number;
-  raf: number;
-  last: number;
-}
-
-const W = 900;
-const H = 340;
-const GROUND = H - 56;
-const BULL_X = 90;
-const BULL_SIZE = 64;
-const GRAVITY = 2200;
-const JUMP_V = -840;
-
-type SpriteKey = "bull" | "paperhand" | "beartrap" | "coin" | "solbag";
-const SPRITE_SLOTS: Record<string, SpriteKey> = {
-  "sprite-bull-runner": "bull",
-  "sprite-paperhand": "paperhand",
-  "sprite-beartrap": "beartrap",
-  "sprite-coin": "coin",
-  "sprite-solbag": "solbag",
-};
-
-/** Deterministic daily challenge derived from today's date. */
-function getDailyChallenge(): { id: string; label: string; check: (s: { coins: number; score: number; time: number }) => boolean } {
-  const day = new Date().toISOString().slice(0, 10);
-  const seed = day.split("-").reduce((a, b) => a + Number(b), 0);
-  const pool = [
-    { id: "coins15", label: "Collect 15+ coins in a single run", check: (s: any) => s.coins >= 15 },
-    { id: "score2k", label: "Score 2,000+ in a single run", check: (s: any) => s.score >= 2000 },
-    { id: "survive45", label: "Survive 45 seconds without getting rekt", check: (s: any) => s.time >= 45 },
-    { id: "coins10score1k", label: "10+ coins AND 1,000+ score in one run", check: (s: any) => s.coins >= 10 && s.score >= 1000 },
-  ];
-  return { ...pool[seed % pool.length], id: `${day}-${pool[seed % pool.length].id}` };
-}
-
-/* ---------------- component ---------------- */
+const TABS: { id: ArcadeGame; label: string; icon: typeof Gamepad2; desc: string }[] = [
+  { id: "charge", label: "Charge", icon: Gamepad2, desc: "Endless runner · combos & power-ups" },
+  { id: "tap", label: "Bull Tap", icon: Zap, desc: "30s reflex · tap the bulls" },
+  { id: "hold", label: "Hold the Line", icon: Gem, desc: "Diamond hands · release in the zone" },
+];
 
 export function Charge() {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const game = useRef<GameState>({
-    popups: [],
-    phase: "idle",
-    bullY: GROUND - BULL_SIZE,
-    bullVy: 0,
-    jumpsLeft: 2,
-    speed: 340,
-    distance: 0,
-    coins: 0,
-    entities: [],
-    spawnIn: 1.2,
-    time: 0,
-    raf: 0,
-    last: 0,
-  });
-
-  const { address, connect } = useWallet();
-  const { earn, grantBonus } = useHerd();
-  const [phase, setPhase] = useState<Phase>("idle");
-  const [score, setScore] = useState(0);
-  const [coins, setCoins] = useState(0);
-  const [hpEarned, setHpEarned] = useState(0);
-  const [highScore, setHighScore] = useState(0);
-  const [submitted, setSubmitted] = useState(false);
-  const [playerScores, setPlayerScores] = useState<Array<{ name: string; score: number }>>([]);
-  const [dailyDone, setDailyDone] = useState(false);
-  const daily = useRef(getDailyChallenge());
-  const sprites = useRef<Partial<Record<SpriteKey, HTMLImageElement>>>({});
+  const [tab, setTab] = useState<ArcadeGame>("charge");
+  const [board, setBoard] = useState<ArcadeScore[]>([]);
+  const [highs, setHighs] = useState(loadHighs());
+  const { address } = useWallet();
 
   useEffect(() => {
-    const load = (slot: string, key: SpriteKey, url: string) => {
-      const img = new Image();
-      img.crossOrigin = "anonymous";
-      img.onload = () => {
-        sprites.current[key] = img;
-      };
-      img.src = url;
-    };
-    fetch("/api/assets")
-      .then((r) => r.json())
-      .then((json) => {
-        for (const [slot, key] of Object.entries(SPRITE_SLOTS)) {
-          const s = json.slots?.[slot];
-          const url = s?.url ? `${s.url}?v=${s.uploadedAt}` : slotUrl(slot);
-          load(slot, key, url);
-        }
-      })
-      .catch(() => {
-        for (const [slot, key] of Object.entries(SPRITE_SLOTS)) {
-          load(slot, key, slotUrl(slot));
-        }
-      });
+    setBoard(loadLeaderboard());
+    setHighs(loadHighs());
   }, []);
 
-  useEffect(() => {
-    setHighScore(store.get<number>(LS.highScore, 0));
-    setPlayerScores(store.get<Array<{ name: string; score: number }>>(LS.playerScores, []));
-    setDailyDone(store.get<string[]>(LS.daily, []).includes(daily.current.id));
-  }, []);
+  const refreshBoard = (rows: ArcadeScore[]) => {
+    setBoard(rows);
+    setHighs(loadHighs());
+  };
 
-  /* ---------------- core loop ---------------- */
-
-  const draw = useCallback((g: GameState, ctx: CanvasRenderingContext2D) => {
-    // Sky
-    const sky = ctx.createLinearGradient(0, 0, 0, H);
-    sky.addColorStop(0, VOID);
-    sky.addColorStop(1, "#16121C");
-    ctx.fillStyle = sky;
-    ctx.fillRect(0, 0, W, H);
-
-    // Parallax grid floor lines
-    ctx.strokeStyle = "rgba(212,175,55,0.08)";
-    ctx.lineWidth = 1;
-    const offset = (g.distance * 0.6) % 48;
-    for (let x = -offset; x < W; x += 48) {
-      ctx.beginPath();
-      ctx.moveTo(x, GROUND);
-      ctx.lineTo(x - 30, H);
-      ctx.stroke();
-    }
-
-    // Ground
-    ctx.fillStyle = GOLD;
-    ctx.fillRect(0, GROUND, W, 2.5);
-    ctx.fillStyle = "rgba(212,175,55,0.06)";
-    ctx.fillRect(0, GROUND, W, H - GROUND);
-
-    // Entities
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    for (const e of g.entities) {
-      if (e.collected) continue;
-      const cx = e.x + e.w / 2;
-      const cy = e.y + e.h / 2;
-      if (e.kind === "coin") {
-        const coin = sprites.current.coin;
-        if (coin) {
-          ctx.drawImage(coin, e.x, e.y, e.w, e.h);
-        } else {
-          ctx.save();
-          ctx.shadowColor = GOLD;
-          ctx.shadowBlur = 12;
-          ctx.fillStyle = GOLD;
-          ctx.beginPath();
-          ctx.arc(cx, cy, e.w / 2, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.restore();
-        }
-      } else if (e.kind === "solbag") {
-        const bag = sprites.current.solbag;
-        if (bag) ctx.drawImage(bag, e.x, e.y, e.w, e.h);
-        else {
-          ctx.font = `${e.h}px sans-serif`;
-          ctx.fillText("💰", cx, cy);
-        }
-      } else if (e.kind === "paperhand") {
-        const ph = sprites.current.paperhand;
-        if (ph) ctx.drawImage(ph, e.x, e.y, e.w, e.h);
-        else {
-          ctx.font = `${e.h}px sans-serif`;
-          ctx.fillText("🧻", cx, cy);
-        }
-      } else {
-        const bear = sprites.current.beartrap;
-        if (bear) ctx.drawImage(bear, e.x, e.y, e.w, e.h);
-        else {
-          ctx.font = `${e.h}px sans-serif`;
-          ctx.fillText("🐻", cx, cy);
-        }
-      }
-    }
-
-    // The bull — sprite from Blob or procedural fallback
-    const bullImg = sprites.current.bull;
-    if (bullImg) {
-      ctx.save();
-      ctx.globalAlpha = 0.3;
-      ctx.drawImage(bullImg, BULL_X - 18, g.bullY + 8, BULL_SIZE * 0.9, BULL_SIZE * 0.9);
-      ctx.restore();
-      ctx.drawImage(bullImg, BULL_X, g.bullY, BULL_SIZE, BULL_SIZE);
-    } else {
-      ctx.save();
-      ctx.globalAlpha = 0.25;
-      drawBull(ctx, BULL_X - 22, g.bullY + 6, BULL_SIZE * 0.9, "silhouette");
-      ctx.restore();
-      drawBull(ctx, BULL_X, g.bullY, BULL_SIZE, "gold");
-    }
-
-    // Floating reward popups
-    ctx.textAlign = "center";
-    for (const p of g.popups) {
-      ctx.save();
-      ctx.globalAlpha = Math.max(0, p.life);
-      ctx.fillStyle = GOLD_BRIGHT;
-      ctx.font = "900 18px Impact, sans-serif";
-      ctx.fillText(p.text, p.x, p.y - (1 - p.life) * 40);
-      ctx.restore();
-    }
-
-    // HUD
-    ctx.textAlign = "left";
-    ctx.fillStyle = BONE;
-    ctx.font = "700 16px monospace";
-    ctx.fillText(`SCORE ${Math.floor(g.distance + g.coins * 100)}`, 16, 26);
-    ctx.fillStyle = GOLD;
-    ctx.fillText(`◉ ${g.coins}`, 16, 48);
-  }, []);
-
-  const endRun = useCallback(
-    (g: GameState) => {
-      g.phase = "over";
-      cancelAnimationFrame(g.raf);
-      const finalScore = Math.floor(g.distance + g.coins * 100);
-      setPhase("over");
-      setScore(finalScore);
-      setCoins(g.coins);
-      setSubmitted(false);
-
-      // Herd Points: score ÷ 50, clamped — every run feeds your rank.
-      const { gained } = earn("game", { score: finalScore });
-      setHpEarned(gained);
-
-      const prevHigh = store.get<number>(LS.highScore, 0);
-      if (finalScore > prevHigh) {
-        store.set(LS.highScore, finalScore);
-        setHighScore(finalScore);
-        fireConfetti({ count: 140 });
-      }
-
-      // Daily challenge check — +50 HP bonus on first completion today
-      const d = daily.current;
-      if (d.check({ coins: g.coins, score: finalScore, time: g.time })) {
-        const done = store.get<string[]>(LS.daily, []);
-        if (!done.includes(d.id)) {
-          store.set(LS.daily, [...done, d.id]);
-          setDailyDone(true);
-          const bonus = claimDailyChallenge(address);
-          if (bonus) grantBonus(bonus.gained, bonus.label);
-          fireConfetti({ count: 100 });
-        }
-      }
-    },
-    [address, earn, grantBonus]
-  );
-
-  const loop = useCallback(
-    (now: number) => {
-      const g = game.current;
-      const canvas = canvasRef.current;
-      const ctx = canvas?.getContext("2d");
-      if (!canvas || !ctx) return;
-      if (g.phase !== "running") return;
-
-      const dt = Math.min(0.033, (now - g.last) / 1000 || 0.016);
-      g.last = now;
-      g.time += dt;
-
-      // Difficulty ramps with time
-      g.speed = 340 + Math.min(360, g.time * 14);
-      g.distance += g.speed * dt * 0.08;
-
-      // Physics
-      g.bullVy += GRAVITY * dt;
-      g.bullY += g.bullVy * dt;
-      if (g.bullY >= GROUND - BULL_SIZE) {
-        g.bullY = GROUND - BULL_SIZE;
-        g.bullVy = 0;
-        g.jumpsLeft = 2;
-      }
-
-      // Spawning
-      g.spawnIn -= dt;
-      if (g.spawnIn <= 0) {
-        const r = Math.random();
-        if (r < 0.42) {
-          g.entities.push({ x: W + 40, y: GROUND - 44, w: 40, h: 44, kind: "paperhand" });
-        } else if (r < 0.68) {
-          g.entities.push({ x: W + 40, y: GROUND - 34, w: 46, h: 34, kind: "beartrap" });
-        } else if (r < 0.9) {
-          // Arc of 3 coins at jump height
-          const baseY = GROUND - 130 - Math.random() * 70;
-          for (let i = 0; i < 3; i++) {
-            g.entities.push({ x: W + 40 + i * 34, y: baseY - Math.sin((i / 2) * Math.PI) * 24, w: 24, h: 24, kind: "coin" });
-          }
-        } else {
-          g.entities.push({ x: W + 40, y: GROUND - 170 - Math.random() * 40, w: 34, h: 34, kind: "solbag" });
-        }
-        g.spawnIn = Math.max(0.55, 1.4 - g.time * 0.012) * (0.7 + Math.random() * 0.6);
-      }
-
-      // Move + collide
-      const bull = { x: BULL_X + 10, y: g.bullY + 12, w: BULL_SIZE - 20, h: BULL_SIZE - 16 };
-      for (const e of g.entities) {
-        e.x -= g.speed * dt;
-        if (e.collected) continue;
-        const hit =
-          bull.x < e.x + e.w && bull.x + bull.w > e.x && bull.y < e.y + e.h && bull.y + bull.h > e.y;
-        if (!hit) continue;
-        if (e.kind === "coin") {
-          e.collected = true;
-          g.coins += 1;
-          g.popups.push({ x: e.x + e.w / 2, y: e.y, text: "+100", life: 1 });
-        } else if (e.kind === "solbag") {
-          e.collected = true;
-          g.coins += 5;
-          g.popups.push({ x: e.x + e.w / 2, y: e.y, text: "+500 SOL BAG!", life: 1 });
-        } else {
-          draw(g, ctx);
-          endRun(g);
-          return;
-        }
-      }
-      g.entities = g.entities.filter((e) => e.x > -80 && !e.collected);
-
-      // Fade out reward popups
-      for (const p of g.popups) p.life -= dt * 1.3;
-      g.popups = g.popups.filter((p) => p.life > 0);
-
-      draw(g, ctx);
-      g.raf = requestAnimationFrame(loop);
-    },
-    [draw, endRun]
-  );
-
-  const start = useCallback(() => {
-    const g = game.current;
-    cancelAnimationFrame(g.raf);
-    Object.assign(g, {
-      phase: "running",
-      popups: [],
-      bullY: GROUND - BULL_SIZE,
-      bullVy: 0,
-      jumpsLeft: 2,
-      speed: 340,
-      distance: 0,
-      coins: 0,
-      entities: [],
-      spawnIn: 1.1,
-      time: 0,
-      last: performance.now(),
-    });
-    setPhase("running");
-    setScore(0);
-    g.raf = requestAnimationFrame(loop);
-  }, [loop]);
-
-  const togglePause = useCallback(() => {
-    const g = game.current;
-    if (g.phase === "running") {
-      g.phase = "paused";
-      cancelAnimationFrame(g.raf);
-      setPhase("paused");
-    } else if (g.phase === "paused") {
-      g.phase = "running";
-      g.last = performance.now();
-      setPhase("running");
-      g.raf = requestAnimationFrame(loop);
-    }
-  }, [loop]);
-
-  const jump = useCallback(() => {
-    const g = game.current;
-    if (g.phase === "idle" || g.phase === "over") {
-      start();
-      return;
-    }
-    if (g.phase !== "running" || g.jumpsLeft <= 0) return;
-    g.bullVy = JUMP_V;
-    g.jumpsLeft -= 1;
-  }, [start]);
-
-  // Keyboard + initial idle frame
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.code === "Space") {
-        // Only hijack space when the game is on screen-ish
-        const rect = canvasRef.current?.getBoundingClientRect();
-        if (rect && rect.top < window.innerHeight && rect.bottom > 0) {
-          e.preventDefault();
-          jump();
-        }
-      }
-      if (e.code === "KeyP") togglePause();
-    };
-    window.addEventListener("keydown", onKey);
-
-    // Draw an idle frame so the canvas isn't blank before play.
-    const ctx = canvasRef.current?.getContext("2d");
-    if (ctx) draw(game.current, ctx);
-
-    const g = game.current;
-    return () => {
-      window.removeEventListener("keydown", onKey);
-      cancelAnimationFrame(g.raf);
-    };
-  }, [jump, togglePause, draw]);
-
-  function submitScore() {
-    if (!address || submitted) return;
-    const entry = { name: shortAddress(address), score };
-    const next = [...playerScores, entry].sort((a, b) => b.score - a.score).slice(0, 10);
-    setPlayerScores(next);
-    store.set(LS.playerScores, next);
-    setSubmitted(true);
-    fireConfetti({ count: 90 });
-  }
-
-  // Real submitted runs only — stored on this device.
-  const leaderboard = [...playerScores].sort((a, b) => b.score - a.score).slice(0, 8);
+  const filtered = board.filter((e) => (e.game ?? "charge") === tab).slice(0, 8);
 
   return (
     <section id="charge" className="relative scroll-mt-16 border-t border-edge/50 bg-abyss/40 py-20 sm:py-28">
       <div className="mx-auto max-w-7xl px-4 sm:px-6">
         <SectionHeader
-          kicker="Section 02 — The Game"
-          title="Charge"
-          sub="Run, bull, run. Leap the paperhands, dodge the bear traps, hoover up $ANSEM coins and SOL bags. Space / tap to jump — double-jump is real. P to pause."
+          kicker="Section 02 — Arcade"
+          title="The Arcade"
+          sub="Three ways to earn Herd Points. Charge through obstacles, tap bulls on reflex, or hold the line like a true diamond hand. Every run counts toward quests."
+          index="02"
         />
 
-        <div className="grid gap-8 lg:grid-cols-[1fr_340px]">
-          {/* Game canvas */}
-          <motion.div
-            initial={{ opacity: 0, y: 24 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.6 }}
-          >
-            <div
-              className="relative cursor-pointer border border-gold/25 shadow-panel [clip-path:polygon(14px_0,100%_0,100%_calc(100%-14px),calc(100%-14px)_100%,0_100%,0_14px)]"
-              onPointerDown={(e) => {
-                e.preventDefault();
-                jump();
-              }}
-            >
-              <canvas ref={canvasRef} width={W} height={H} className="block w-full touch-none select-none" />
-
-              {/* Overlays */}
-              {phase === "idle" && (
-                <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-void/70">
-                  <p className="font-display text-2xl uppercase tracking-widest text-gold">Ready to charge?</p>
-                  <p className="font-mono text-xs text-ash">Space / tap to jump · double jump enabled</p>
-                  <Button size="lg" onClick={start}>
-                    <Play size={16} /> Start Run
-                  </Button>
-                </div>
-              )}
-              {phase === "paused" && (
-                <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-void/70">
-                  <p className="font-display text-2xl uppercase tracking-widest text-bone">Paused</p>
-                  <Button onClick={togglePause}>
-                    <Play size={15} /> Resume
-                  </Button>
-                </div>
-              )}
-              {phase === "over" && (
-                <motion.div
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-void/80 px-4 text-center"
-                >
-                  <p className="font-display text-lg uppercase tracking-widest text-crimson">Trampled!</p>
-                  <p className="font-display text-4xl uppercase text-gold">{score.toLocaleString()}</p>
-                  <p className="font-mono text-xs text-ash">
-                    {coins} coins · best {Math.max(highScore, score).toLocaleString()}
-                  </p>
-                  {hpEarned > 0 && (
-                    <motion.p
-                      initial={{ scale: 0.6, opacity: 0 }}
-                      animate={{ scale: 1, opacity: 1 }}
-                      transition={{ type: "spring", stiffness: 300, damping: 18, delay: 0.2 }}
-                      className="border border-gold/50 bg-gold/10 px-3 py-1.5 font-display text-sm uppercase tracking-wider text-gold"
-                    >
-                      +{hpEarned} Herd Points earned
-                    </motion.p>
-                  )}
-                  <div className="mt-2 flex flex-wrap justify-center gap-2">
-                    <Button size="sm" onClick={start}>
-                      <RotateCcw size={14} /> Run it back
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="crimson"
-                      onClick={() =>
-                        shareOnX(
-                          `Just scored ${score.toLocaleString()} in CHARGE 🐂 — the $ANSEM endless runner. The bull cannot be stopped. Beat me:`
-                        )
-                      }
-                    >
-                      <Share2 size={14} /> Flex on X
-                    </Button>
-                    {address ? (
-                      <Button size="sm" variant="outline" onClick={submitScore} disabled={submitted}>
-                        <Trophy size={14} /> {submitted ? "Submitted ✓" : "Submit score"}
-                      </Button>
-                    ) : (
-                      <Button size="sm" variant="outline" onClick={connect}>
-                        Connect to submit
-                      </Button>
-                    )}
-                  </div>
-                </motion.div>
-              )}
-            </div>
-
-            <div className="mt-4 flex flex-wrap items-center gap-3">
-              {phase === "running" || phase === "paused" ? (
-                <Button size="sm" variant="outline" onClick={togglePause}>
-                  {phase === "paused" ? <Play size={14} /> : <Pause size={14} />}
-                  {phase === "paused" ? "Resume" : "Pause"}
-                </Button>
-              ) : null}
-              <Button size="sm" variant="ghost" onClick={start}>
-                <RotateCcw size={14} /> Restart
-              </Button>
-              <span className="ml-auto font-mono text-xs text-ash">
-                Personal best: <span className="text-gold">{highScore.toLocaleString()}</span>
-              </span>
-            </div>
-
-            {/* Daily challenge */}
-            <div
+        {/* Game picker */}
+        <div className="mb-8 grid gap-3 sm:grid-cols-3">
+          {TABS.map((t) => (
+            <button
+              key={t.id}
+              onClick={() => setTab(t.id)}
               className={cn(
-                "mt-4 flex items-center justify-between gap-4 border px-4 py-3",
-                dailyDone ? "border-gold/50 bg-gold/10" : "border-edge bg-panel"
+                "flex items-start gap-3 border p-4 text-left transition-all horn-clip-sm",
+                tab === t.id
+                  ? "border-gold/50 bg-gold/10 shadow-gold-glow"
+                  : "border-edge bg-panel hover:border-gold/30"
               )}
             >
-              <div>
-                <p className="font-mono text-[10px] uppercase tracking-[0.25em] text-crimson">
-                  Daily challenge
-                </p>
-                <p className="mt-1 text-sm text-bone">{daily.current.label}</p>
-              </div>
-              <span className={cn("font-display text-xs uppercase", dailyDone ? "text-gold" : "text-ash")}>
-                {dailyDone ? "Complete ✓" : "Incomplete"}
+              <t.icon size={20} className={tab === t.id ? "text-gold" : "text-ash"} />
+              <span>
+                <span className="block font-display text-sm uppercase tracking-wide text-bone">{t.label}</span>
+                <span className="mt-0.5 block font-mono text-[10px] text-ash">{t.desc}</span>
+                <span className="mt-1 block font-mono text-[10px] text-gold">
+                  Best: {highs[t.id].toLocaleString()}
+                </span>
               </span>
-            </div>
+            </button>
+          ))}
+        </div>
+
+        <div className="grid gap-8 lg:grid-cols-[1fr_300px]">
+          <motion.div
+            key={tab}
+            initial={{ opacity: 0, x: 12 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.25 }}
+          >
+            {tab === "charge" && (
+              <ChargeRunner leaderboard={board} onLeaderboard={refreshBoard} />
+            )}
+            {tab === "tap" && (
+              <BullTap onEnd={() => setHighs(loadHighs())} />
+            )}
+            {tab === "hold" && (
+              <HoldTheLine onEnd={() => setHighs(loadHighs())} />
+            )}
           </motion.div>
 
-          {/* Leaderboard */}
-          <motion.aside
-            initial={{ opacity: 0, y: 24 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.6, delay: 0.1 }}
-            className="border border-edge bg-panel p-5 shadow-panel [clip-path:polygon(14px_0,100%_0,100%_calc(100%-14px),calc(100%-14px)_100%,0_100%,0_14px)]"
-          >
+          <aside className="border border-edge bg-panel p-5 shadow-panel horn-clip">
             <h3 className="flex items-center gap-2 font-display text-sm uppercase tracking-widest text-gold">
-              <Trophy size={16} /> Stampede board
+              <Trophy size={16} /> {GAME_LABELS[tab]} board
             </h3>
-            <p className="mt-1 font-mono text-[10px] text-ash">
-              Real runs on this device — connect wallet to submit yours
-            </p>
-            {leaderboard.length === 0 && (
+            <p className="mt-1 font-mono text-[10px] text-ash">Top runs on this device</p>
+            {filtered.length === 0 ? (
               <p className="mt-6 text-center text-xs text-ash">
-                No scores submitted yet.
-                <br />
-                <span className="text-gold">Be the first bull on the board.</span>
+                No scores yet — <span className="text-gold">claim the board.</span>
               </p>
+            ) : (
+              <ol className="mt-4 space-y-1">
+                {filtered.map((e, i) => {
+                  const isYou = address && e.name === shortAddress(address);
+                  return (
+                    <li
+                      key={`${e.name}-${e.score}-${i}`}
+                      className={cn(
+                        "flex justify-between border-b border-edge/40 py-2 font-mono text-xs last:border-0",
+                        isYou && "text-gold"
+                      )}
+                    >
+                      <span>
+                        {i + 1}. {e.name} {isYou && "←"}
+                      </span>
+                      <span className="tabular-nums text-ash">{e.score.toLocaleString()}</span>
+                    </li>
+                  );
+                })}
+              </ol>
             )}
-            <ol className="mt-4 space-y-1.5">
-              {leaderboard.map((entry, i) => {
-                const isPlayer = address && entry.name === shortAddress(address);
-                return (
-                  <li
-                    key={`${entry.name}-${entry.score}`}
-                    className={cn(
-                      "flex items-center justify-between border-b border-edge/50 px-2 py-2 font-mono text-xs last:border-0",
-                      isPlayer && "bg-gold/10 text-gold"
-                    )}
-                  >
-                    <span className="flex items-center gap-2.5">
-                      <span className={cn("w-5 text-right", i < 3 ? "text-gold" : "text-ash")}>
-                        {i + 1}
-                      </span>
-                      <span className={isPlayer ? "text-gold" : "text-bone"}>
-                        {entry.name} {isPlayer && "← you"}
-                      </span>
-                    </span>
-                    <span className="tabular-nums text-ash">{entry.score.toLocaleString()}</span>
-                  </li>
-                );
-              })}
-            </ol>
-          </motion.aside>
+          </aside>
         </div>
       </div>
     </section>

@@ -29,7 +29,7 @@ const item = {
 
 const QUICK_STATS = [
   { icon: Flame, label: "Meme Forge", href: "#forge" },
-  { icon: Zap, label: "Charge Game", href: "#charge" },
+  { icon: Zap, label: "Arcade", href: "#charge" },
   { icon: Target, label: "Daily Quests", href: "#quests" },
 ];
 

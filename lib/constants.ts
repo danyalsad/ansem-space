@@ -38,6 +38,7 @@ export const LS = {
   memes: "ansem_memes",
   memeVotes: "ansem_meme_votes",
   highScore: "ansem_highscore",
+  gameHighs: "ansem_game_highs",
   playerScores: "ansem_player_scores",
   daily: "ansem_daily",
   prediction: "ansem_prediction",
