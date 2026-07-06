@@ -31,20 +31,49 @@ export function Herd() {
   const { data, weeklyPoints, rank, weeklyRank } = useHerd();
   const [tab, setTab] = useState<"total" | "weekly">("total");
 
-  // Real profiles stored on this device (guest + every wallet that played).
+  // Local profiles on this device (fallback when the global API is down).
   const [players, setPlayers] = useState<HerdEntry[]>([]);
   useEffect(() => {
     setPlayers(listLocalPlayers(address));
   }, [address, data.total]);
 
+  // GLOBAL leaderboard from Supabase — every wallet that ever synced.
+  const [global, setGlobal] = useState<{
+    allTime: Array<{ wallet: string; name: string; total: number }>;
+    weekly: Array<{ wallet: string; name: string; points: number }>;
+  } | null>(null);
+  useEffect(() => {
+    fetch("/api/herd")
+      .then((r) => r.json())
+      .then((j) => {
+        if (Array.isArray(j.allTime)) setGlobal({ allTime: j.allTime, weekly: j.weekly ?? [] });
+      })
+      .catch(() => {});
+  }, [data.total]);
+
   const youName = address ? shortAddress(address) : "You (guest)";
-  const board = (
-    players.some((p) => p.isYou)
-      ? players
-      : [...players, { name: youName, total: data.total, weekly: weeklyPoints, isYou: true }]
-  )
-    .sort((a, b) => (tab === "total" ? b.total - a.total : b.weekly - a.weekly))
-    .slice(0, 12);
+
+  let board: HerdEntry[];
+  if (global) {
+    const rows =
+      tab === "total"
+        ? global.allTime.map((p) => ({ name: p.name, total: p.total, weekly: 0, isYou: p.wallet === address }))
+        : global.weekly.map((p) => ({ name: p.name, total: 0, weekly: p.points, isYou: p.wallet === address }));
+    // If you haven't synced yet (guest or first visit), show your row too.
+    if (!rows.some((r) => r.isYou) && data.total > 0) {
+      rows.push({ name: youName, total: data.total, weekly: weeklyPoints, isYou: true });
+      rows.sort((a, b) => (tab === "total" ? b.total - a.total : b.weekly - a.weekly));
+    }
+    board = rows.slice(0, 15);
+  } else {
+    board = (
+      players.some((p) => p.isYou)
+        ? players
+        : [...players, { name: youName, total: data.total, weekly: weeklyPoints, isYou: true }]
+    )
+      .sort((a, b) => (tab === "total" ? b.total - a.total : b.weekly - a.weekly))
+      .slice(0, 12);
+  }
 
   return (
     <section id="herd" className="relative scroll-mt-16 border-t border-edge/50 bg-abyss/40 py-20 sm:py-28">
@@ -67,6 +96,11 @@ export function Herd() {
             <div className="flex items-center justify-between border-b border-edge px-5 py-4">
               <h3 className="flex items-center gap-2 font-display text-sm uppercase tracking-widest text-gold">
                 <Crown size={16} /> Leaderboard
+                {global && (
+                  <span className="flex items-center gap-1.5 font-mono text-[9px] uppercase tracking-widest text-gold">
+                    <span className="h-1.5 w-1.5 animate-pulseglow rounded-full bg-gold" /> Global
+                  </span>
+                )}
               </h3>
               <div className="flex border border-edge">
                 {(["total", "weekly"] as const).map((m) => (
@@ -119,8 +153,9 @@ export function Herd() {
               })}
             </ol>
             <p className="px-5 py-3 font-mono text-[10px] text-ash/70">
-              Real scores, stored on this device — a global on-chain board is next. Every wallet
-              that plays here gets its own row.
+              {global
+                ? "Global leaderboard — live for every player, worldwide. Connect your wallet and earn HP to claim a row."
+                : "Local scores (this device) — connecting to the global board…"}
             </p>
           </motion.div>
 
@@ -150,11 +185,21 @@ export function Herd() {
               <div className="mt-4 grid grid-cols-2 gap-3 text-center">
                 <div className="border border-edge px-2 py-3">
                   <p className="font-display text-2xl text-gold">{data.total.toLocaleString()}</p>
-                  <p className="mt-1 font-mono text-[9px] uppercase tracking-wider text-ash">Total HP · #{rank}</p>
+                  <p className="mt-1 font-mono text-[9px] uppercase tracking-wider text-ash">
+                    Total HP{" "}
+                    {global
+                      ? `· global #${(global.allTime.findIndex((p) => p.wallet === address) + 1) || "—"}`
+                      : `· #${rank}`}
+                  </p>
                 </div>
                 <div className="border border-edge px-2 py-3">
                   <p className="font-display text-2xl text-bone">{weeklyPoints.toLocaleString()}</p>
-                  <p className="mt-1 font-mono text-[9px] uppercase tracking-wider text-ash">This week · #{weeklyRank}</p>
+                  <p className="mt-1 font-mono text-[9px] uppercase tracking-wider text-ash">
+                    This week{" "}
+                    {global
+                      ? `· global #${(global.weekly.findIndex((p) => p.wallet === address) + 1) || "—"}`
+                      : `· #${weeklyRank}`}
+                  </p>
                 </div>
               </div>
               <p className="mt-3 flex items-center gap-2 font-mono text-[11px] text-ash">

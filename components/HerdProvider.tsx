@@ -30,6 +30,7 @@ import {
   type PlayerData,
 } from "@/lib/points";
 import { fireConfetti } from "@/lib/confetti";
+import { shortAddress } from "@/lib/utils";
 
 interface Toast {
   id: number;
@@ -89,6 +90,27 @@ export function HerdProvider({ children }: { children: ReactNode }) {
   const weeklyPoints = data.weekly[weekKey()] ?? 0;
   // Rank against every real profile on this device (guest + wallets).
   const players = typeof window !== "undefined" ? listLocalPlayers(address) : [];
+
+  // Sync the profile to the GLOBAL leaderboard (Supabase via /api/herd).
+  // Debounced; wallet-connected players only — guests stay local.
+  useEffect(() => {
+    if (!address || data.total === 0) return;
+    const t = setTimeout(() => {
+      fetch("/api/herd", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          wallet: address,
+          name: shortAddress(address),
+          total: data.total,
+          weeklyPoints: data.weekly[weekKey()] ?? 0,
+          streak: data.streak,
+          badges: data.badges,
+        }),
+      }).catch(() => {});
+    }, 1500);
+    return () => clearTimeout(t);
+  }, [address, data]);
 
   return (
     <HerdContext.Provider

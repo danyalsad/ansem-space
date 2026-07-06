@@ -22,11 +22,22 @@ import {
 import { SectionHeader } from "@/components/SectionHeader";
 import { Button } from "@/components/ui/button";
 import { useHerd } from "@/components/HerdProvider";
+import { useWallet } from "@/components/WalletProvider";
 import { fileToDataUrl, listAssets, saveAsset, type SiteAsset } from "@/lib/assets";
 import { drawBull } from "@/lib/bull";
 import { LS, shareOnX } from "@/lib/constants";
 import { fireConfetti } from "@/lib/confetti";
-import { cn, store } from "@/lib/utils";
+import { cn, shortAddress, store } from "@/lib/utils";
+
+/** Stable anonymous voter id for visitors without a wallet. */
+function getGuestId(): string {
+  let id = store.get<string | null>("ansem_voter_id", null);
+  if (!id) {
+    id = `guest-${Math.random().toString(36).slice(2, 12)}`;
+    store.set("ansem_voter_id", id);
+  }
+  return id;
+}
 
 /* ------------------------------------------------------------------ */
 /* Templates: each draws a full 1080x1080 scene procedurally.           */
@@ -243,6 +254,9 @@ export function Forge() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const stickerRef = useRef<HTMLImageElement | null>(null);
   const { earn } = useHerd();
+  const { address } = useWallet();
+  // true = gallery is the shared Supabase-backed one; false = offline local
+  const [globalMode, setGlobalMode] = useState(false);
 
   // Custom image templates (user uploads + admin assets, see lib/assets.ts)
   const [customTemplates, setCustomTemplates] = useState<SiteAsset[]>([]);
@@ -418,13 +432,33 @@ export function Forge() {
     render();
   }, [render, imgTick]);
 
-  /* ---------------- gallery persistence ---------------- */
+  /* ---------------- gallery: global (Supabase) with local fallback ---------------- */
+
+  const refreshGallery = useCallback(async () => {
+    const res = await fetch("/api/memes");
+    const json = await res.json();
+    if (!Array.isArray(json.memes)) throw new Error("bad response");
+    setGlobalMode(true);
+    setMemes(
+      json.memes.map((m: { id: string; caption: string; author: string; votes: number; createdAt: string; imageUrl: string }) => ({
+        id: m.id,
+        caption: m.caption,
+        author: m.author,
+        votes: m.votes,
+        ts: Date.parse(m.createdAt),
+        image: m.imageUrl,
+      }))
+    );
+  }, []);
 
   useEffect(() => {
-    const saved = store.get<GalleryMeme[]>(LS.memes, []);
-    setMemes([...saved, ...SEED_MEMES]);
+    refreshGallery().catch(() => {
+      // Offline fallback: this browser's memes only.
+      const saved = store.get<GalleryMeme[]>(LS.memes, []);
+      setMemes([...saved, ...SEED_MEMES]);
+    });
     setVoted(store.get<string[]>(LS.memeVotes, []));
-  }, []);
+  }, [refreshGallery]);
 
   function persistUserMemes(all: GalleryMeme[]) {
     // Only user-created memes go to storage; seeds are rebuilt on load.
@@ -434,7 +468,25 @@ export function Forge() {
     );
   }
 
-  function addMemeToGallery(image: string | undefined, caption: string) {
+  async function addMemeToGallery(image: string | undefined, caption: string) {
+    // Global path: image → Vercel Blob, metadata → Supabase, visible to all.
+    if (globalMode && image) {
+      try {
+        const blob = await (await fetch(image)).blob();
+        const form = new FormData();
+        form.set("file", new File([blob], "meme.jpg", { type: blob.type || "image/jpeg" }));
+        form.set("caption", caption || "Fresh from the Forge 🔥");
+        form.set("author", address ? shortAddress(address) : "anon");
+        const res = await fetch("/api/memes", { method: "POST", body: form });
+        if (!res.ok) throw new Error("post failed");
+        await refreshGallery();
+        earn("meme_post"); // +50 HP, counts toward Meme Lord badge
+        fireConfetti({ count: 90 });
+        return;
+      } catch {
+        /* fall through to local */
+      }
+    }
     const meme: GalleryMeme = {
       id: `user-${Date.now()}`,
       caption: caption || "Fresh from the Forge 🔥",
@@ -449,21 +501,43 @@ export function Forge() {
       persistUserMemes(next);
       return next;
     });
-    earn("meme_post"); // +50 HP, counts toward Meme Lord badge
+    earn("meme_post");
     fireConfetti({ count: 90 });
   }
 
-  function upvote(id: string) {
+  async function upvote(id: string) {
     if (voted.includes(id)) return;
+    const markVoted = () => {
+      const nextVoted = [...voted, id];
+      setVoted(nextVoted);
+      store.set(LS.memeVotes, nextVoted);
+    };
+
+    if (globalMode) {
+      // Server enforces one vote per voter (wallet or guest id).
+      const res = await fetch("/api/memes/vote", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ memeId: id, voter: address ?? getGuestId() }),
+      }).catch(() => null);
+      if (res?.ok) {
+        const j = await res.json();
+        setMemes((prev) => prev.map((m) => (m.id === id ? { ...m, votes: j.votes ?? m.votes + 1 } : m)));
+        markVoted();
+        earn("upvote"); // +5 HP, counts toward Voice of the Herd badge
+      } else if (res?.status === 409) {
+        markVoted(); // already voted server-side
+      }
+      return;
+    }
+
     setMemes((prev) => {
       const next = prev.map((m) => (m.id === id ? { ...m, votes: m.votes + 1 } : m));
       persistUserMemes(next);
       return next;
     });
-    const nextVoted = [...voted, id];
-    setVoted(nextVoted);
-    store.set(LS.memeVotes, nextVoted);
-    earn("upvote"); // +5 HP, counts toward Voice of the Herd badge
+    markVoted();
+    earn("upvote");
   }
 
   /** Upload a custom image as a reusable meme template. */
@@ -491,13 +565,13 @@ export function Forge() {
     img.src = URL.createObjectURL(file);
   }
 
-  function onGalleryUpload(e: ChangeEvent<HTMLInputElement>) {
+  async function onGalleryUpload(e: ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => addMemeToGallery(String(reader.result), uploadCaption);
-    reader.readAsDataURL(file);
     e.target.value = "";
+    // Downscale/compress so posts stay under the 2 MB API cap.
+    const dataUrl = await fileToDataUrl(file, 1080);
+    await addMemeToGallery(dataUrl, uploadCaption);
     setUploadCaption("");
   }
 
@@ -749,8 +823,13 @@ export function Forge() {
         {/* ------------- Community Gallery ------------- */}
         <div className="mt-20">
           <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
-            <h3 className="font-display text-xl uppercase tracking-wide text-bone sm:text-2xl">
+            <h3 className="flex items-center gap-3 font-display text-xl uppercase tracking-wide text-bone sm:text-2xl">
               Community <span className="text-gold">Gallery</span>
+              {globalMode && (
+                <span className="flex items-center gap-1.5 font-mono text-[9px] uppercase tracking-widest text-gold">
+                  <span className="h-1.5 w-1.5 animate-pulseglow rounded-full bg-gold" /> Global
+                </span>
+              )}
             </h3>
             <div className="flex items-center gap-3">
               <div className="flex border border-edge">
