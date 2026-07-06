@@ -59,13 +59,18 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 
-  const url = process.env.POSTGRES_URL_NON_POOLING ?? process.env.POSTGRES_URL;
-  if (!url) return NextResponse.json({ error: "no postgres url in env" }, { status: 500 });
+  const raw = process.env.POSTGRES_URL_NON_POOLING ?? process.env.POSTGRES_URL;
+  if (!raw) return NextResponse.json({ error: "no postgres url in env" }, { status: 500 });
+
+  // Supabase requires TLS but its chain isn't in the serverless trust store;
+  // sslmode in the URL overrides the ssl option, so rewrite it there.
+  const url = raw.includes("sslmode=")
+    ? raw.replace(/sslmode=[^&]+/, "sslmode=no-verify")
+    : `${raw}${raw.includes("?") ? "&" : "?"}sslmode=no-verify`;
 
   const body = await req.json().catch(() => ({}));
 
-  // Supabase requires TLS; its chain isn't in the serverless trust store.
-  const client = new Client({ connectionString: url, ssl: { rejectUnauthorized: false } });
+  const client = new Client({ connectionString: url });
   try {
     await client.connect();
     if (body.action === "cleanup") {
