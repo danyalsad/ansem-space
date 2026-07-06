@@ -64,9 +64,10 @@ export async function POST(req: Request) {
 
   const body = await req.json().catch(() => ({}));
 
-  const client = new Client({ connectionString: url });
-  await client.connect();
+  // Supabase requires TLS; its chain isn't in the serverless trust store.
+  const client = new Client({ connectionString: url, ssl: { rejectUnauthorized: false } });
   try {
+    await client.connect();
     if (body.action === "cleanup") {
       // Remove verification fixtures created during smoke tests.
       await client.query("delete from players where wallet = $1", [body.wallet ?? ""]);
@@ -79,7 +80,12 @@ export async function POST(req: Request) {
       "select tablename from pg_tables where schemaname = 'public' order by tablename"
     );
     return NextResponse.json({ ok: true, tables: tables.rows.map((r) => r.tablename) });
+  } catch (e) {
+    return NextResponse.json(
+      { error: e instanceof Error ? e.message : "migration failed" },
+      { status: 500 }
+    );
   } finally {
-    await client.end();
+    await client.end().catch(() => {});
   }
 }
