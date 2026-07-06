@@ -5,11 +5,9 @@ import { seededRandom } from "@/lib/utils";
 /**
  * GET /api/holders — $ANSEM holder distribution for the Intel bubblemap.
  *
- * Today: returns realistic simulated data (deterministic, so the map is
- * stable between requests).
- *
- * To go live: set HELIUS_API_KEY in Vercel env vars and implement the
- * fetch below. The key stays server-side — never expose it to the client.
+ * With HELIUS_API_KEY set (Vercel env var, server-side only): returns the
+ * real top-20 token holders via Helius RPC. Without it — or if Helius
+ * errors — falls back to simulated data with the same shape.
  */
 
 export const dynamic = "force-dynamic";
@@ -20,26 +18,62 @@ interface Holder {
   isAnsem: boolean;
 }
 
-export async function GET() {
-  const apiKey = process.env.HELIUS_API_KEY;
+interface HoldersBody {
+  source: "helius" | "simulated";
+  token: string;
+  holders: Holder[];
+}
 
-  if (apiKey) {
-    // TODO (real data): Helius DAS — getTokenLargestAccounts / getTokenAccounts
-    // const res = await fetch(`https://mainnet.helius-rpc.com/?api-key=${apiKey}`, {
-    //   method: "POST",
-    //   headers: { "Content-Type": "application/json" },
-    //   body: JSON.stringify({
-    //     jsonrpc: "2.0",
-    //     id: "holders",
-    //     method: "getTokenLargestAccounts",
-    //     params: [CONTRACT_ADDRESS],
-    //   }),
-    //   next: { revalidate: 300 },
-    // });
-    // ...map response into Holder[] and return it.
-  }
+// Per-instance memo so bursts of visitors don't hammer Helius.
+let cache: { at: number; body: HoldersBody } | null = null;
+const TTL_MS = 120_000;
 
-  // Simulated fallback — same shape the real integration will return.
+const short = (a: string) => `${a.slice(0, 4)}…${a.slice(-4)}`;
+
+async function fetchRealHolders(apiKey: string): Promise<Holder[]> {
+  const rpc = `https://mainnet.helius-rpc.com/?api-key=${apiKey}`;
+  const call = async (method: string, params: unknown[]) => {
+    const res = await fetch(rpc, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ jsonrpc: "2.0", id: method, method, params }),
+      cache: "no-store",
+    });
+    if (!res.ok) throw new Error(`Helius ${method}: HTTP ${res.status}`);
+    const json = await res.json();
+    if (json.error) throw new Error(`Helius ${method}: ${json.error.message}`);
+    return json.result;
+  };
+
+  const [largest, supply] = await Promise.all([
+    call("getTokenLargestAccounts", [CONTRACT_ADDRESS]),
+    call("getTokenSupply", [CONTRACT_ADDRESS]),
+  ]);
+
+  const accounts: Array<{ address: string; uiAmount: number }> = largest.value;
+  const totalSupply: number = supply.value.uiAmount;
+  if (!accounts?.length || !totalSupply) throw new Error("empty holder data");
+
+  // Token accounts → owner wallets, so the map shows people not ATAs.
+  const owners = await call("getMultipleAccounts", [
+    accounts.map((a) => a.address),
+    { encoding: "jsonParsed" },
+  ]);
+
+  return accounts
+    .map((a, i) => {
+      const owner: string =
+        owners?.value?.[i]?.data?.parsed?.info?.owner ?? a.address;
+      return {
+        label: short(owner),
+        pct: Number(((a.uiAmount / totalSupply) * 100).toFixed(2)),
+        isAnsem: false,
+      };
+    })
+    .filter((h) => h.pct > 0);
+}
+
+function simulatedHolders(): Holder[] {
   const rand = seededRandom(4269);
   const names = ["LP Pool", "orca.sol", "herd_og", "moby", "grandma_sol", "bullmonk", "deepwater", "hoofdaddy"];
   const holders: Holder[] = [{ label: "Ansem 🐂", pct: 6.9, isAnsem: true }];
@@ -50,10 +84,27 @@ export async function GET() {
       isAnsem: false,
     });
   }
+  return holders;
+}
 
-  return NextResponse.json({
-    source: "simulated",
-    token: CONTRACT_ADDRESS,
-    holders,
-  });
+export async function GET() {
+  if (cache && Date.now() - cache.at < TTL_MS) {
+    return NextResponse.json(cache.body);
+  }
+
+  const apiKey = process.env.HELIUS_API_KEY;
+  let body: HoldersBody;
+
+  if (apiKey) {
+    try {
+      body = { source: "helius", token: CONTRACT_ADDRESS, holders: await fetchRealHolders(apiKey) };
+    } catch {
+      body = { source: "simulated", token: CONTRACT_ADDRESS, holders: simulatedHolders() };
+    }
+  } else {
+    body = { source: "simulated", token: CONTRACT_ADDRESS, holders: simulatedHolders() };
+  }
+
+  if (body.source === "helius") cache = { at: Date.now(), body };
+  return NextResponse.json(body);
 }

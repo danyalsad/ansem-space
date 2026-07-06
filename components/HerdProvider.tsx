@@ -21,6 +21,7 @@ import { useWallet } from "@/components/WalletProvider";
 import {
   awardPoints,
   computeRank,
+  listLocalPlayers,
   loadPlayer,
   mergeGuestInto,
   weekKey,
@@ -86,14 +87,16 @@ export function HerdProvider({ children }: { children: ReactNode }) {
   }, [address, earn]);
 
   const weeklyPoints = data.weekly[weekKey()] ?? 0;
+  // Rank against every real profile on this device (guest + wallets).
+  const players = typeof window !== "undefined" ? listLocalPlayers(address) : [];
 
   return (
     <HerdContext.Provider
       value={{
         data,
         weeklyPoints,
-        rank: computeRank(data.total),
-        weeklyRank: computeRank(data.total, "weekly", weeklyPoints),
+        rank: computeRank(players, data.total, "total"),
+        weeklyRank: computeRank(players, weeklyPoints, "weekly"),
         earn,
       }}
     >

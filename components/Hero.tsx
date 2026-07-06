@@ -72,8 +72,8 @@ export function Hero() {
 
           <motion.p variants={item} className="mt-4 max-w-xl text-sm leading-relaxed text-ash">
             The central hub for the <span className="text-gold">$ANSEM</span> community — meme
-            forge, endless-runner arcade, diamond-hands culture, full lore archive and live-feel
-            intel. Built by the herd, for the herd.
+            forge, endless-runner arcade, diamond-hands culture, full lore archive and live
+            on-chain intel. Built by the herd, for the herd.
           </motion.p>
 
           <motion.div variants={item} className="mt-8">

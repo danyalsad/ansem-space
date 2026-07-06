@@ -61,10 +61,11 @@ export function Footer() {
             </h4>
             <p className="mt-4 text-xs leading-relaxed text-ash">
               ANSEM Space is a <span className="text-bone">community-built fan site</span>. It is
-              not affiliated with, endorsed by, or operated by Ansem (@blknoiz06). Prices, stats
-              and leaderboards on this site are simulated for entertainment. $ANSEM is a meme
-              coin with no intrinsic value or expectation of financial return. Nothing here is
-              financial advice — never invest more than you can afford to lose.
+              not affiliated with, endorsed by, or operated by Ansem (@blknoiz06). Market data is
+              provided by DexScreener and on-chain data by Helius; Herd Points and game scores are
+              stored locally in your browser. $ANSEM is a meme coin with no intrinsic value or
+              expectation of financial return. Nothing here is financial advice — never invest
+              more than you can afford to lose.
             </p>
           </div>
         </div>
@@ -86,9 +87,6 @@ export function Footer() {
               className="font-mono text-gold transition-colors hover:text-gold-glow"
             >
               𝕏 @DannyMD_UK
-            </a>
-            <a href="/admin" className="font-mono text-ash/60 transition-colors hover:text-ash">
-              admin
             </a>
           </div>
         </div>

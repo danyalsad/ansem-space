@@ -2,9 +2,12 @@
 
 /**
  * SECTION 5 — INTEL (Dashboard)
- * Live-feel (simulated) on-chain + social tools: whale movement feed with
- * Ansem's wallet highlighted, a social sentiment gauge, a bubblemaps-style
- * holder visualization, and the Next Airdrop Predictor with local voting.
+ * Real on-chain + market tools:
+ *  - Whale feed: live $ANSEM transactions via /api/whales (Helius)
+ *  - Sentiment: real 24h buy/sell pressure via DexScreener
+ *  - Bubblemap: live top-holder distribution via /api/holders (Helius)
+ *  - Airdrop predictor: honest local community poll (+20 HP)
+ * Each panel falls back gracefully (and says so) if a data source is down.
  */
 
 import { useEffect, useState } from "react";
@@ -12,69 +15,83 @@ import { AnimatePresence, motion } from "framer-motion";
 import { Activity, Radar, Waves } from "lucide-react";
 import { SectionHeader } from "@/components/SectionHeader";
 import { useHerd } from "@/components/HerdProvider";
-import { useWallet } from "@/components/WalletProvider";
+import { useMarket } from "@/components/MarketProvider";
 import { LS } from "@/lib/constants";
 import { fireConfetti } from "@/lib/confetti";
-import { cn, fakeSolAddress, formatCompact, seededRandom, shortAddress, store } from "@/lib/utils";
+import { cn, formatCompact, formatUsd, seededRandom, store } from "@/lib/utils";
 
-/* ---------------- whale feed ---------------- */
+type Source = "helius" | "simulated" | "loading";
+
+function SourceBadge({ source }: { source: Source }) {
+  return (
+    <span
+      className={cn(
+        "ml-auto flex items-center gap-1.5 font-mono text-[9px] uppercase tracking-widest",
+        source === "helius" ? "text-gold" : "text-ash/60"
+      )}
+    >
+      <span
+        className={cn(
+          "h-1.5 w-1.5 rounded-full",
+          source === "helius" ? "animate-pulseglow bg-gold" : "bg-ash/40"
+        )}
+      />
+      {source === "helius" ? "Live · Helius" : source === "loading" ? "Connecting…" : "Offline demo"}
+    </span>
+  );
+}
+
+/* ---------------- whale feed (live) ---------------- */
 
 interface WhaleTx {
-  id: number;
+  id: string;
   wallet: string;
-  isAnsem: boolean;
   action: "BUY" | "SELL" | "TRANSFER";
   amount: number;
   ts: string;
 }
 
-const WHALE_NAMES = ["orca.sol", "moby_degen", "deepwater", "leviathan", "krakenfeed", "bigfin"];
-
-function makeTx(id: number): WhaleTx {
-  const isAnsem = Math.random() < 0.18;
-  const r = Math.random();
-  return {
-    id,
-    wallet: isAnsem ? "Ansem 🐂" : Math.random() < 0.5 ? WHALE_NAMES[Math.floor(Math.random() * WHALE_NAMES.length)] : shortAddress(fakeSolAddress()),
-    isAnsem,
-    // Ansem never sells in our simulation. Obviously.
-    action: isAnsem ? (r < 0.6 ? "BUY" : "TRANSFER") : r < 0.45 ? "BUY" : r < 0.75 ? "SELL" : "TRANSFER",
-    amount: Math.floor(Math.random() * 4_800_000) + 150_000,
-    ts: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" }),
-  };
-}
+const POLL_MS = 25_000;
 
 function WhaleFeed() {
   const [txs, setTxs] = useState<WhaleTx[]>([]);
+  const [source, setSource] = useState<Source>("loading");
 
   useEffect(() => {
-    let id = 0;
-    let timer: ReturnType<typeof setTimeout>;
     let cancelled = false;
+    let timer: ReturnType<typeof setTimeout>;
 
-    // Seed from the API route (simulated today, Helius-ready — see
-    // app/api/whales/route.ts), then keep the feed ticking client-side.
-    fetch("/api/whales")
-      .then((r) => r.json())
-      .then((json: { txs: Array<Omit<WhaleTx, "id" | "ts">> }) => {
-        if (cancelled) return;
-        setTxs(
-          json.txs.slice(0, 4).map((t) => ({
-            ...t,
-            id: id++,
-            ts: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" }),
-          }))
-        );
-      })
-      .catch(() => {
-        if (!cancelled) setTxs([makeTx(id++), makeTx(id++), makeTx(id++)]);
+    const fmt = (unix?: number) =>
+      new Date(unix ? unix * 1000 : Date.now()).toLocaleTimeString([], {
+        hour: "2-digit",
+        minute: "2-digit",
       });
 
-    const tick = () => {
-      setTxs((prev) => [makeTx(id++), ...prev].slice(0, 7));
-      timer = setTimeout(tick, 1800 + Math.random() * 2600);
-    };
-    timer = setTimeout(tick, 2200);
+    async function load() {
+      try {
+        const res = await fetch("/api/whales");
+        const json: {
+          source: string;
+          txs: Array<{ id: string; wallet: string; action: WhaleTx["action"]; amount: number; time?: number }>;
+        } = await res.json();
+        if (cancelled) return;
+        setSource(json.source === "helius" ? "helius" : "simulated");
+        setTxs(
+          json.txs.slice(0, 8).map((t) => ({
+            id: t.id,
+            wallet: t.wallet,
+            action: t.action,
+            amount: t.amount,
+            ts: fmt(t.time),
+          }))
+        );
+      } catch {
+        if (!cancelled) setSource((s) => (s === "loading" ? "simulated" : s));
+      }
+      if (!cancelled) timer = setTimeout(load, POLL_MS);
+    }
+
+    load();
     return () => {
       cancelled = true;
       clearTimeout(timer);
@@ -85,31 +102,32 @@ function WhaleFeed() {
     <div className="border border-edge bg-panel p-5 shadow-panel [clip-path:polygon(12px_0,100%_0,100%_calc(100%-12px),calc(100%-12px)_100%,0_100%,0_12px)]">
       <h3 className="flex items-center gap-2 font-display text-sm uppercase tracking-widest text-gold">
         <Waves size={16} /> Whale Movements
+        <SourceBadge source={source} />
       </h3>
-      <p className="mt-1 font-mono text-[10px] text-ash">Simulated feed · Ansem's wallet highlighted</p>
+      <p className="mt-1 font-mono text-[10px] text-ash">
+        Recent $ANSEM transactions on Solana · refreshes every {POLL_MS / 1000}s
+      </p>
       <div className="mt-4 space-y-1.5 overflow-hidden">
+        {txs.length === 0 && (
+          <p className="py-6 text-center font-mono text-xs text-ash">Scanning the chain…</p>
+        )}
         <AnimatePresence initial={false}>
           {txs.map((tx) => (
             <motion.div
               key={tx.id}
               layout
-              initial={{ opacity: 0, x: -24, height: 0 }}
-              animate={{ opacity: 1, x: 0, height: "auto" }}
+              initial={{ opacity: 0, x: -24 }}
+              animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0 }}
               transition={{ duration: 0.35 }}
-              className={cn(
-                "flex items-center justify-between gap-2 border-b border-edge/40 py-2 font-mono text-xs",
-                tx.isAnsem && "bg-gold/10 px-2 text-gold"
-              )}
+              className="flex items-center justify-between gap-2 border-b border-edge/40 py-2 font-mono text-xs"
             >
-              <span className={cn("truncate", tx.isAnsem ? "font-bold text-gold" : "text-bone")}>
-                {tx.wallet}
-              </span>
+              <span className="truncate text-bone">{tx.wallet}</span>
               <span
                 className={cn(
                   "shrink-0 px-1.5 py-0.5 text-[10px] font-bold",
                   tx.action === "BUY" && "bg-gold/15 text-gold",
-                  tx.action === "SELL" && "bg-crimson/15 text-crimson",
+                  tx.action === "SELL" && "bg-crimson/15 text-crimson-bright",
                   tx.action === "TRANSFER" && "bg-bone/10 text-ash"
                 )}
               >
@@ -125,64 +143,75 @@ function WhaleFeed() {
   );
 }
 
-/* ---------------- sentiment gauge ---------------- */
-
-const FAKE_POSTS = [
-  { handle: "@bullish_bertha", text: "$ANSEM chart looking like my heart rate when Ansem tweets", mood: "🔥" },
-  { handle: "@sol_scout", text: "the $ANSEM community might be the most unhinged (affectionate) on CT", mood: "🐂" },
-  { handle: "@chartgoblin", text: "took profit on everything except $ANSEM. some things you just hold", mood: "💎" },
-  { handle: "@fudpatrol", text: "tried to fud $ANSEM, got memed into oblivion, buying back in", mood: "😅" },
-];
+/* ---------------- sentiment gauge (real buy/sell pressure) ---------------- */
 
 function SentimentGauge() {
-  const [value, setValue] = useState(78);
+  const market = useMarket();
+  const totalTx = market.buys24h + market.sells24h;
+  // Buy share of the last 24h of real transactions.
+  const value = totalTx > 0 ? (market.buys24h / totalTx) * 100 : 50;
 
-  useEffect(() => {
-    const id = setInterval(() => {
-      setValue((v) => Math.min(97, Math.max(55, v + (Math.random() * 10 - 4.4))));
-    }, 3200);
-    return () => clearInterval(id);
-  }, []);
-
-  // Map 0-100 to a 180° arc needle
   const angle = -90 + (value / 100) * 180;
-  const label = value > 85 ? "MAXIMUM BULL" : value > 70 ? "BULLISH" : value > 55 ? "WARMING UP" : "COPING";
+  const label = !market.live
+    ? "CONNECTING…"
+    : value > 62
+      ? "MAXIMUM BULL"
+      : value > 52
+        ? "BULLISH"
+        : value > 45
+          ? "CONTESTED"
+          : "BEARS TESTING";
 
   return (
     <div className="border border-edge bg-panel p-5 shadow-panel [clip-path:polygon(12px_0,100%_0,100%_calc(100%-12px),calc(100%-12px)_100%,0_100%,0_12px)]">
       <h3 className="flex items-center gap-2 font-display text-sm uppercase tracking-widest text-gold">
-        <Activity size={16} /> Social Sentiment
+        <Activity size={16} /> Buy Pressure
+        <span className="ml-auto flex items-center gap-1.5 font-mono text-[9px] uppercase tracking-widest text-gold">
+          <span className={cn("h-1.5 w-1.5 rounded-full", market.live ? "animate-pulseglow bg-gold" : "bg-ash/40")} />
+          {market.live ? "Live · DexScreener" : "Connecting…"}
+        </span>
       </h3>
+      <p className="mt-1 font-mono text-[10px] text-ash">
+        Real buys vs sells over the last 24h
+      </p>
       <div className="mx-auto mt-4 w-full max-w-[240px]">
         <svg viewBox="0 0 200 118" className="w-full">
-          {/* Arc segments: cope → bull */}
-          <path d="M 16 104 A 84 84 0 0 1 60 30" fill="none" stroke="#FF2E2E" strokeWidth="13" strokeLinecap="round" opacity="0.75" />
+          <path d="M 16 104 A 84 84 0 0 1 60 30" fill="none" stroke="#C8102E" strokeWidth="13" strokeLinecap="round" opacity="0.75" />
           <path d="M 66 26 A 84 84 0 0 1 134 26" fill="none" stroke="#8C7326" strokeWidth="13" strokeLinecap="round" opacity="0.85" />
           <path d="M 140 30 A 84 84 0 0 1 184 104" fill="none" stroke="#D4AF37" strokeWidth="13" strokeLinecap="round" />
-          {/* Needle */}
           <g transform={`rotate(${angle} 100 104)`} style={{ transition: "transform 1.2s cubic-bezier(0.34,1.56,0.64,1)" }}>
-            <line x1="100" y1="104" x2="100" y2="34" stroke="#EDE8DC" strokeWidth="3.5" strokeLinecap="round" />
+            <line x1="100" y1="104" x2="100" y2="34" stroke="#F2EFE9" strokeWidth="3.5" strokeLinecap="round" />
           </g>
           <circle cx="100" cy="104" r="7" fill="#D4AF37" />
         </svg>
         <p className="text-center font-display text-xl uppercase tracking-widest text-gold">{label}</p>
-        <p className="text-center font-mono text-xs text-ash">{value.toFixed(0)} / 100 herd energy</p>
+        <p className="text-center font-mono text-xs text-ash">
+          {market.live ? `${value.toFixed(0)}% of 24h txns are buys` : "fetching market data"}
+        </p>
       </div>
-      <div className="mt-4 space-y-2 border-t border-edge pt-4">
-        {FAKE_POSTS.map((p) => (
-          <div key={p.handle} className="flex gap-2 text-xs">
-            <span>{p.mood}</span>
-            <p className="text-ash">
-              <span className="font-mono text-bone">{p.handle}</span> {p.text}
-            </p>
-          </div>
-        ))}
+      <div className="mt-4 grid grid-cols-2 gap-2 border-t border-edge pt-4 text-center sm:grid-cols-4">
+        <div>
+          <p className="font-mono text-sm text-gold">{market.buys24h.toLocaleString()}</p>
+          <p className="font-mono text-[9px] uppercase tracking-wider text-ash">Buys 24h</p>
+        </div>
+        <div>
+          <p className="font-mono text-sm text-crimson-bright">{market.sells24h.toLocaleString()}</p>
+          <p className="font-mono text-[9px] uppercase tracking-wider text-ash">Sells 24h</p>
+        </div>
+        <div>
+          <p className="font-mono text-sm text-bone">{formatUsd(market.volume24h, 0)}</p>
+          <p className="font-mono text-[9px] uppercase tracking-wider text-ash">Volume 24h</p>
+        </div>
+        <div>
+          <p className="font-mono text-sm text-bone">{formatUsd(market.liquidity, 0)}</p>
+          <p className="font-mono text-[9px] uppercase tracking-wider text-ash">Liquidity</p>
+        </div>
       </div>
     </div>
   );
 }
 
-/* ---------------- holder bubblemap ---------------- */
+/* ---------------- holder bubblemap (live) ---------------- */
 
 interface Bubble {
   x: number;
@@ -190,65 +219,52 @@ interface Bubble {
   r: number;
   label: string;
   pct: string;
-  isAnsem: boolean;
 }
 
 interface HolderDto {
   label: string;
   pct: number;
-  isAnsem: boolean;
 }
 
 /** Rejection-sample non-overlapping positions for the holder bubbles. */
 function layoutBubbles(holders: HolderDto[]): Bubble[] {
   const rand = seededRandom(42);
+  const maxPct = Math.max(...holders.map((h) => h.pct), 1);
   const bubbles: Bubble[] = [];
   for (const h of holders) {
-    const r = h.isAnsem ? 15 : Math.min(11, 2 + h.pct * 2.4);
-    if (h.isAnsem) {
-      bubbles.push({ x: 50, y: 46, r, label: h.label, pct: `${h.pct}%`, isAnsem: true });
-      continue;
-    }
-    let x = 0, y = 0, ok = false, tries = 0;
-    while (!ok && tries < 60) {
-      x = 8 + rand() * 84;
-      y = 10 + rand() * 78;
+    // Radius scales with share of the largest holder.
+    const r = 3 + (h.pct / maxPct) * 12;
+    let x = 0,
+      y = 0,
+      ok = false,
+      tries = 0;
+    while (!ok && tries < 80) {
+      x = 10 + rand() * 80;
+      y = 12 + rand() * 72;
       ok = bubbles.every((b) => Math.hypot(b.x - x, b.y - y) > b.r + r + 1.5);
       tries++;
     }
-    bubbles.push({ x, y, r, label: h.label, pct: `${h.pct}%`, isAnsem: false });
+    bubbles.push({ x, y, r, label: h.label, pct: `${h.pct.toFixed(2)}%` });
   }
   return bubbles;
 }
 
-/** Client fallback if the API route is unreachable. */
-function fallbackHolders(): HolderDto[] {
-  const rand = seededRandom(42);
-  return [
-    { label: "Ansem 🐂", pct: 6.9, isAnsem: true },
-    ...Array.from({ length: 20 }, () => ({
-      label: shortAddress(fakeSolAddress(rand)),
-      pct: Number((0.2 + rand() * 3.2).toFixed(2)),
-      isAnsem: false,
-    })),
-  ];
-}
-
 function BubbleMap() {
   const [bubbles, setBubbles] = useState<Bubble[]>([]);
+  const [source, setSource] = useState<Source>("loading");
   const [hovered, setHovered] = useState<Bubble | null>(null);
 
-  // Distribution comes from the API route (simulated today, Helius-ready —
-  // see app/api/holders/route.ts).
   useEffect(() => {
     let cancelled = false;
     fetch("/api/holders")
       .then((r) => r.json())
-      .then((json: { holders: HolderDto[] }) => {
-        if (!cancelled) setBubbles(layoutBubbles(json.holders));
+      .then((json: { source: string; holders: HolderDto[] }) => {
+        if (cancelled) return;
+        setSource(json.source === "helius" ? "helius" : "simulated");
+        setBubbles(layoutBubbles(json.holders));
       })
       .catch(() => {
-        if (!cancelled) setBubbles(layoutBubbles(fallbackHolders()));
+        if (!cancelled) setSource("simulated");
       });
     return () => {
       cancelled = true;
@@ -258,50 +274,54 @@ function BubbleMap() {
   return (
     <div className="border border-edge bg-panel p-5 shadow-panel [clip-path:polygon(12px_0,100%_0,100%_calc(100%-12px),calc(100%-12px)_100%,0_100%,0_12px)]">
       <h3 className="flex items-center gap-2 font-display text-sm uppercase tracking-widest text-gold">
-        <Radar size={16} /> Holder Bubblemap
+        <Radar size={16} /> Top Holders
+        <SourceBadge source={source} />
       </h3>
       <p className="mt-1 font-mono text-[10px] text-ash">
-        {hovered ? `${hovered.label} · ${hovered.pct} of supply` : "Hover a bubble · simulated distribution"}
+        {hovered
+          ? `${hovered.label} holds ${hovered.pct} of supply`
+          : "Largest 20 wallets by share of supply · hover a bubble"}
       </p>
-      <svg viewBox="0 0 100 92" className="mt-3 w-full">
-        {bubbles.map((b, i) => (
-          <motion.circle
-            key={i}
-            cx={b.x}
-            cy={b.y}
-            r={b.r}
-            initial={{ scale: 0, opacity: 0 }}
-            whileInView={{ scale: 1, opacity: 1 }}
-            viewport={{ once: true }}
-            transition={{ delay: i * 0.03, type: "spring", stiffness: 200, damping: 16 }}
-            onMouseEnter={() => setHovered(b)}
-            onMouseLeave={() => setHovered(null)}
-            className="cursor-pointer"
-            fill={b.isAnsem ? "rgba(212,175,55,0.85)" : "rgba(237,232,220,0.14)"}
-            stroke={b.isAnsem ? "#D4AF37" : hovered === b ? "#D4AF37" : "rgba(212,175,55,0.25)"}
-            strokeWidth="0.5"
-          />
-        ))}
-        {/* Label the Ansem bubble directly */}
-        <text x="50" y="47.5" textAnchor="middle" fontSize="4" fill="#0A0A0A" fontWeight="900">
-          ANSEM
-        </text>
-      </svg>
+      {bubbles.length === 0 ? (
+        <p className="py-14 text-center font-mono text-xs text-ash">Mapping holders…</p>
+      ) : (
+        <svg viewBox="0 0 100 92" className="mt-3 w-full">
+          {bubbles.map((b, i) => (
+            <motion.circle
+              key={`${b.label}-${i}`}
+              cx={b.x}
+              cy={b.y}
+              r={b.r}
+              initial={{ scale: 0, opacity: 0 }}
+              whileInView={{ scale: 1, opacity: 1 }}
+              viewport={{ once: true }}
+              transition={{ delay: i * 0.03, type: "spring", stiffness: 200, damping: 16 }}
+              onMouseEnter={() => setHovered(b)}
+              onMouseLeave={() => setHovered(null)}
+              className="cursor-pointer"
+              fill={i === 0 ? "rgba(212,175,55,0.8)" : "rgba(242,239,233,0.14)"}
+              stroke={i === 0 ? "#D4AF37" : hovered === b ? "#D4AF37" : "rgba(212,175,55,0.25)"}
+              strokeWidth="0.5"
+            >
+              <title>{`${b.label} · ${b.pct}`}</title>
+            </motion.circle>
+          ))}
+        </svg>
+      )}
     </div>
   );
 }
 
-/* ---------------- airdrop predictor ---------------- */
+/* ---------------- airdrop predictor (honest local poll) ---------------- */
 
 const PREDICTION_OPTIONS = [
-  { id: "week", label: "This week", base: 342 },
-  { id: "month", label: "This month", base: 511 },
-  { id: "moon", label: "On a full moon 🌕", base: 189 },
-  { id: "cooking", label: "Never — he's cooking something bigger", base: 267 },
+  { id: "week", label: "This week" },
+  { id: "month", label: "This month" },
+  { id: "moon", label: "On a full moon 🌕" },
+  { id: "cooking", label: "Never — he's cooking something bigger" },
 ];
 
 function AirdropPredictor() {
-  const { address } = useWallet();
   const { earn } = useHerd();
   const [choice, setChoice] = useState<string | null>(null);
 
@@ -317,20 +337,16 @@ function AirdropPredictor() {
     fireConfetti({ count: 60 });
   }
 
-  const total = PREDICTION_OPTIONS.reduce((a, o) => a + o.base, 0) + (choice ? 1 : 0);
-
   return (
     <div className="border border-gold/30 bg-panel p-5 shadow-panel [clip-path:polygon(12px_0,100%_0,100%_calc(100%-12px),calc(100%-12px)_100%,0_100%,0_12px)]">
       <h3 className="font-display text-sm uppercase tracking-widest text-gold">
         🪂 Next Airdrop Predictor
       </h3>
       <p className="mt-1 font-mono text-[10px] text-ash">
-        When does the legend rain on the herd again? Cast your prophecy.
+        When does the legend rain on the herd again? Cast your prophecy — worth +20 HP.
       </p>
       <div className="mt-4 space-y-2.5">
         {PREDICTION_OPTIONS.map((o) => {
-          const votes = o.base + (choice === o.id ? 1 : 0);
-          const pct = Math.round((votes / total) * 100);
           const mine = choice === o.id;
           return (
             <button
@@ -339,23 +355,15 @@ function AirdropPredictor() {
               disabled={!!choice}
               className={cn(
                 "relative w-full overflow-hidden border px-4 py-3 text-left transition-all",
-                mine ? "border-gold" : "border-edge",
+                mine ? "border-gold bg-gold/10" : "border-edge",
                 !choice && "hover:border-gold/60"
               )}
             >
-              {choice && (
-                <motion.span
-                  className={cn("absolute inset-y-0 left-0", mine ? "bg-gold/20" : "bg-bone/5")}
-                  initial={{ width: 0 }}
-                  animate={{ width: `${pct}%` }}
-                  transition={{ duration: 0.8, ease: "easeOut" }}
-                />
-              )}
               <span className="relative flex items-center justify-between gap-2 text-sm">
                 <span className={mine ? "text-gold" : "text-bone"}>
                   {o.label} {mine && "✓"}
                 </span>
-                {choice && <span className="font-mono text-xs text-ash">{pct}% · {votes}</span>}
+                {mine && <span className="font-mono text-xs text-gold">your prophecy</span>}
               </span>
             </button>
           );
@@ -363,10 +371,8 @@ function AirdropPredictor() {
       </div>
       <p className="mt-3 font-mono text-[10px] text-ash">
         {choice
-          ? "Prophecy recorded. The herd remembers."
-          : address
-            ? "One vote per bull."
-            : "Tip: connect your wallet first for maximum prophecy energy."}
+          ? "Prophecy recorded on this device. The herd remembers."
+          : "One vote per bull. Stored locally."}
       </p>
     </div>
   );
@@ -381,7 +387,7 @@ export function Intel() {
         <SectionHeader
           kicker="Section 05 — Dashboard"
           title="Intel"
-          sub="The war room. Watch the whales move, read the herd's mood, map the holders, and prophesy the next airdrop. All signals simulated for entertainment — feels live, hits different."
+          sub="The war room, running on real data: live whale movements and holder distribution from the Solana chain, and genuine 24h buy/sell pressure from DexScreener."
         />
         <div className="grid gap-6 md:grid-cols-2">
           <WhaleFeed />

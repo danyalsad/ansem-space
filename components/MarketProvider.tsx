@@ -22,6 +22,7 @@ interface DexPair {
   priceUsd?: string;
   priceChange?: { h24?: number };
   volume?: { h24?: number };
+  txns?: { h24?: { buys?: number; sells?: number } };
   marketCap?: number;
   fdv?: number;
   liquidity?: { usd?: number };
@@ -34,16 +35,20 @@ export interface MarketData {
   volume24h: number;
   marketCap: number;
   liquidity: number;
+  buys24h: number;
+  sells24h: number;
   updatedAt: number;
 }
 
 const FALLBACK: MarketData = {
   live: false,
-  price: 0.0042,
+  price: 0,
   change24h: 0,
   volume24h: 0,
   marketCap: 0,
   liquidity: 0,
+  buys24h: 0,
+  sells24h: 0,
   updatedAt: 0,
 };
 
@@ -72,6 +77,8 @@ export function MarketProvider({ children }: { children: ReactNode }) {
           volume24h: pair.volume?.h24 ?? 0,
           marketCap: pair.marketCap ?? pair.fdv ?? 0,
           liquidity: pair.liquidity?.usd ?? 0,
+          buys24h: pair.txns?.h24?.buys ?? 0,
+          sells24h: pair.txns?.h24?.sells ?? 0,
           updatedAt: Date.now(),
         });
       } catch {

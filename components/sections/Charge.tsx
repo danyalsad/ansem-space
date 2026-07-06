@@ -65,16 +65,6 @@ const BULL_SIZE = 64;
 const GRAVITY = 2200;
 const JUMP_V = -840;
 
-const FAKE_LEADERBOARD: Array<{ name: string; score: number }> = [
-  { name: "blknoiz_disciple", score: 18452 },
-  { name: "HoofDaddy", score: 15230 },
-  { name: "solana_stampede", score: 12894 },
-  { name: "wagmi_wanda", score: 9917 },
-  { name: "bearhunter.sol", score: 8340 },
-  { name: "kebab_regret", score: 6521 },
-  { name: "diamondDoc", score: 5110 },
-];
-
 /** Deterministic daily challenge derived from today's date. */
 function getDailyChallenge(): { id: string; label: string; check: (s: { coins: number; score: number; time: number }) => boolean } {
   const day = new Date().toISOString().slice(0, 10);
@@ -415,9 +405,8 @@ export function Charge() {
     fireConfetti({ count: 90 });
   }
 
-  const leaderboard = [...FAKE_LEADERBOARD, ...playerScores]
-    .sort((a, b) => b.score - a.score)
-    .slice(0, 8);
+  // Real submitted runs only — stored on this device.
+  const leaderboard = [...playerScores].sort((a, b) => b.score - a.score).slice(0, 8);
 
   return (
     <section id="charge" className="relative scroll-mt-16 border-t border-edge/50 bg-abyss/40 py-20 sm:py-28">
@@ -556,9 +545,18 @@ export function Charge() {
             className="border border-edge bg-panel p-5 shadow-panel [clip-path:polygon(14px_0,100%_0,100%_calc(100%-14px),calc(100%-14px)_100%,0_100%,0_14px)]"
           >
             <h3 className="flex items-center gap-2 font-display text-sm uppercase tracking-widest text-gold">
-              <Trophy size={16} /> Global stampede board
+              <Trophy size={16} /> Stampede board
             </h3>
-            <p className="mt-1 font-mono text-[10px] text-ash">Simulated — connect wallet to enter</p>
+            <p className="mt-1 font-mono text-[10px] text-ash">
+              Real runs on this device — connect wallet to submit yours
+            </p>
+            {leaderboard.length === 0 && (
+              <p className="mt-6 text-center text-xs text-ash">
+                No scores submitted yet.
+                <br />
+                <span className="text-gold">Be the first bull on the board.</span>
+              </p>
+            )}
             <ol className="mt-4 space-y-1.5">
               {leaderboard.map((entry, i) => {
                 const isPlayer = address && entry.name === shortAddress(address);

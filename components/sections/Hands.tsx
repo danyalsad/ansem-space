@@ -2,10 +2,13 @@
 
 /**
  * SECTION 3 — HANDS (Diamond Hands)
- * Community-culture section: animated holder stats, personalized (simulated)
- * diamond-hand status from the connected wallet, a "what if you held"
- * calculator, Hall of Fame / Hall of Shame, and a canvas-generated
- * shareable diamond-hands story card.
+ * Real-data culture section:
+ *  - Live market stats via DexScreener (price, mcap, volume, 24h change)
+ *  - Your status: real Herd Points profile (HP, rank, badges, streak)
+ *  - Bag calculator on the live price
+ *  - Diamond Division: real top holders via /api/holders (Helius)
+ *  - Paperhand Memorial: real recent sells via /api/whales (Helius)
+ *  - Shareable diamond-hands story card (canvas-generated)
  */
 
 import { useEffect, useRef, useState } from "react";
@@ -14,12 +17,14 @@ import { Gem, Share2, Wallet } from "lucide-react";
 import { SectionHeader } from "@/components/SectionHeader";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
-import { useWallet } from "@/components/WalletProvider";
+import { useHerd } from "@/components/HerdProvider";
 import { useMarket } from "@/components/MarketProvider";
+import { useWallet } from "@/components/WalletProvider";
 import { drawBull } from "@/lib/bull";
 import { shareOnX } from "@/lib/constants";
 import { fireConfetti } from "@/lib/confetti";
-import { cn, formatUsd, hashString, seededRandom, shortAddress } from "@/lib/utils";
+import { BADGES } from "@/lib/points";
+import { cn, formatCompact, formatUsd, shortAddress } from "@/lib/utils";
 
 /* ---------------- animated stat counter ---------------- */
 
@@ -61,7 +66,7 @@ function StatTile({
         accent ? "border-gold/40" : "border-edge"
       )}
     >
-      <p className={cn("font-display text-3xl tabular-nums sm:text-4xl", accent ? "text-gold" : "text-bone")}>
+      <p className={cn("font-display text-2xl tabular-nums sm:text-3xl", accent ? "text-gold" : "text-bone")}>
         {display}
         <span className="text-xl">{suffix}</span>
       </p>
@@ -70,38 +75,16 @@ function StatTile({
   );
 }
 
-/* ---------------- fake halls ---------------- */
+/* ---------------- HP-based status tiers (real player data) ---------------- */
 
-const HALL_OF_FAME = [
-  { name: "OG_Hoof", held: "Since block one", bag: "14.2M $ANSEM", gain: "+$48,200", note: "Received airdrop. Never moved a token. Legend." },
-  { name: "grandma_sol", held: "312 days", bag: "8.8M $ANSEM", gain: "+$29,600", note: "Doesn't know how to sell. We're not telling her." },
-  { name: "bullmonk.sol", held: "289 days", bag: "5.1M $ANSEM", gain: "+$17,900", note: "Took a vow of diamond. Meditates on the chart." },
-  { name: "line_holder", held: "245 days", bag: "3.3M $ANSEM", gain: "+$11,400", note: "Bought the dip. Then the dip's dip. Still here." },
-];
-
-const HALL_OF_SHAME = [
-  { name: "kebab_enjoyer", sold: "2.1M $ANSEM", got: "one (1) kebab", missed: "-$7,300", note: "The kebab was reportedly mid." },
-  { name: "sir_paperhands", sold: "900K $ANSEM", got: "$41 of gas fees", missed: "-$3,100", note: "Panic sold a -4% wick. A -4% wick." },
-  { name: "wen_lambo_liu", sold: "5M $ANSEM", got: "a used e-scooter", missed: "-$17,000", note: "The scooter has since been stolen." },
-];
-
-/* ---------------- wallet-derived status (simulated) ---------------- */
-
-function getWalletStatus(address: string) {
-  const rand = seededRandom(hashString(address));
-  const score = Math.floor(rand() * 100);
-  const bag = Math.floor(rand() * 9_000_000) + 120_000;
-  const days = Math.floor(rand() * 300) + 14;
-  const gain = Math.floor(bag * 0.0042 * (0.6 + rand()));
-  const tier =
-    score > 75
-      ? { label: "DIAMOND EMPEROR", emoji: "💎👑", color: "text-gold", desc: "You ARE the line others hold." }
-      : score > 45
-        ? { label: "DIAMOND HANDS", emoji: "💎🙌", color: "text-gold", desc: "Unshakeable. The herd salutes you." }
-        : score > 20
-          ? { label: "IRON GRIP", emoji: "🦾", color: "text-bone", desc: "Wobbled once. Held anyway. Respect." }
-          : { label: "RECOVERING PAPERHAND", emoji: "🧻➡️💎", color: "text-crimson", desc: "We've all been there. Charge again." };
-  return { score, bag, days, gain, tier };
+function getTier(totalHp: number) {
+  if (totalHp >= 2000)
+    return { label: "DIAMOND EMPEROR", emoji: "💎👑", color: "text-gold", desc: "You ARE the line others hold." };
+  if (totalHp >= 750)
+    return { label: "DIAMOND HANDS", emoji: "💎🙌", color: "text-gold", desc: "Unshakeable. The herd salutes you." };
+  if (totalHp >= 200)
+    return { label: "IRON GRIP", emoji: "🦾", color: "text-bone", desc: "Forged in the Charge. Keep stacking HP." };
+  return { label: "FRESH HOOF", emoji: "🐂", color: "text-bone", desc: "Every legend starts here. Go earn some HP." };
 }
 
 /* ---------------- share-card generation ---------------- */
@@ -129,12 +112,12 @@ function generateStoryCard(name: string, story: string, tierLabel: string): stri
   ctx.fillStyle = "#D4AF37";
   ctx.font = "900 44px Impact, sans-serif";
   ctx.fillText("MY DIAMOND HANDS STORY", 230, 125);
-  ctx.fillStyle = "#8B8694";
+  ctx.fillStyle = "#9A95A3";
   ctx.font = "700 22px monospace";
   ctx.fillText(`${name || "Anonymous Bull"} · ${tierLabel}`, 230, 165);
 
   // Wrap the story text
-  ctx.fillStyle = "#EDE8DC";
+  ctx.fillStyle = "#F2EFE9";
   ctx.font = "600 34px Georgia, serif";
   const words = `“${story}”`.split(" ");
   let line = "";
@@ -150,23 +133,66 @@ function generateStoryCard(name: string, story: string, tierLabel: string): stri
   }
   if (y <= 540) ctx.fillText(line, 80, y);
 
-  ctx.fillStyle = "#FF2E2E";
+  ctx.fillStyle = "#C8102E";
   ctx.font = "700 24px monospace";
   ctx.fillText("HOLD THE LINE — ansem.space", 80, 610);
   return canvas.toDataURL("image/png");
+}
+
+/* ---------------- live halls (real chain data) ---------------- */
+
+interface HolderDto {
+  label: string;
+  pct: number;
+}
+interface SellDto {
+  wallet: string;
+  amount: number;
+  time?: number;
+}
+
+function useLiveHalls() {
+  const [holders, setHolders] = useState<HolderDto[]>([]);
+  const [sells, setSells] = useState<SellDto[]>([]);
+  const [live, setLive] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/holders")
+      .then((r) => r.json())
+      .then((json: { source: string; holders: HolderDto[] }) => {
+        if (cancelled) return;
+        setHolders(json.holders.slice(0, 5));
+        if (json.source === "helius") setLive(true);
+      })
+      .catch(() => {});
+    fetch("/api/whales")
+      .then((r) => r.json())
+      .then((json: { txs: Array<SellDto & { action: string }> }) => {
+        if (cancelled) return;
+        setSells(json.txs.filter((t) => t.action === "SELL").slice(0, 4));
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  return { holders, sells, live };
 }
 
 /* ---------------- section ---------------- */
 
 export function Hands() {
   const { address, connect, connecting } = useWallet();
+  const { data, rank } = useHerd();
   const market = useMarket();
-  const status = address ? getWalletStatus(address) : null;
+  const { holders, sells, live } = useLiveHalls();
+  const tier = getTier(data.total);
 
-  // "What if you held" calculator — held side uses the LIVE price.
-  const [airdropAmount, setAirdropAmount] = useState(1_000_000);
-  const heldValue = airdropAmount * market.price;
-  const soldValue = airdropAmount * market.price * 0.074; // assumed early exit near launch price
+  // Bag value calculator — live price, real math.
+  const [bagTokens, setBagTokens] = useState(1_000_000);
+  const bagValue = bagTokens * market.price;
 
   // Story modal
   const [storyOpen, setStoryOpen] = useState(false);
@@ -176,7 +202,7 @@ export function Hands() {
 
   function makeCard() {
     if (!storyText.trim()) return;
-    const url = generateStoryCard(storyName, storyText.trim(), status?.tier.label ?? "DIAMOND HANDS");
+    const url = generateStoryCard(storyName, storyText.trim(), tier.label);
     setCardUrl(url);
     if (url) fireConfetti({ count: 80 });
   }
@@ -187,7 +213,7 @@ export function Hands() {
         <SectionHeader
           kicker="Section 03 — Culture"
           title="Hands"
-          sub="This coin runs on grip strength. Check the herd's stats, reveal your own status, and immortalize your diamond-hands story. Paperhands enter at their own risk."
+          sub="This coin runs on grip strength. Live market stats, your real standing in the herd, and the wallets actually holding the line — straight from the chain."
         />
 
         {/* Live market stats via DexScreener */}
@@ -195,23 +221,12 @@ export function Hands() {
           <StatTile
             value={market.price}
             suffix=""
-            label={market.live ? "Live price (DexScreener)" : "Price (connecting…)"}
+            label={market.live ? "Live price · DexScreener" : "Price (connecting…)"}
             accent
-            format={(v) => `$${v < 0.001 ? v.toFixed(7) : v.toFixed(5)}`}
+            format={(v) => `$${v < 0.001 ? v.toFixed(7) : v.toFixed(4)}`}
           />
-          <StatTile
-            value={market.marketCap}
-            suffix=""
-            label="Market cap"
-            format={(v) => formatUsd(v, 0)}
-          />
-          <StatTile
-            value={market.volume24h}
-            suffix=""
-            label="24h volume"
-            accent
-            format={(v) => formatUsd(v, 0)}
-          />
+          <StatTile value={market.marketCap} suffix="" label="Market cap" format={(v) => formatUsd(v, 0)} />
+          <StatTile value={market.volume24h} suffix="" label="24h volume" accent format={(v) => formatUsd(v, 0)} />
           <StatTile
             value={market.change24h}
             suffix="%"
@@ -221,7 +236,7 @@ export function Hands() {
         </div>
 
         <div className="mt-12 grid gap-8 lg:grid-cols-2">
-          {/* My Status */}
+          {/* My Status — real Herd profile */}
           <motion.div
             initial={{ opacity: 0, y: 24 }}
             whileInView={{ opacity: 1, y: 0 }}
@@ -232,93 +247,88 @@ export function Hands() {
             <h3 className="flex items-center gap-2 font-display text-sm uppercase tracking-widest text-gold">
               <Gem size={16} /> My Status
             </h3>
-            {!address ? (
-              <div className="mt-6 flex flex-col items-start gap-4">
-                <p className="text-sm text-ash">
-                  Connect your wallet to reveal your (highly scientific, fully simulated)
-                  diamond-hand rating.
-                </p>
-                <Button onClick={connect} disabled={connecting}>
-                  <Wallet size={15} /> {connecting ? "Connecting…" : "Connect Wallet"}
-                </Button>
-              </div>
-            ) : status ? (
-              <motion.div
-                key={address}
-                initial={{ opacity: 0, scale: 0.96 }}
-                animate={{ opacity: 1, scale: 1 }}
-                className="mt-5"
-              >
-                <p className="text-4xl">{status.tier.emoji}</p>
-                <p className={cn("mt-2 font-display text-2xl uppercase tracking-wide", status.tier.color)}>
-                  {status.tier.label}
-                </p>
-                <p className="mt-1 text-sm text-ash">{status.tier.desc}</p>
-                <dl className="mt-5 grid grid-cols-3 gap-3 font-mono text-xs">
-                  <div className="border border-edge px-3 py-2.5">
-                    <dt className="text-ash">Grip score</dt>
-                    <dd className="mt-1 text-lg text-gold">{status.score}/100</dd>
-                  </div>
-                  <div className="border border-edge px-3 py-2.5">
-                    <dt className="text-ash">Sim. bag</dt>
-                    <dd className="mt-1 text-lg text-bone">{(status.bag / 1e6).toFixed(1)}M</dd>
-                  </div>
-                  <div className="border border-edge px-3 py-2.5">
-                    <dt className="text-ash">Unrealized</dt>
-                    <dd className="mt-1 text-lg text-gold">+{formatUsd(status.gain)}</dd>
-                  </div>
-                </dl>
-                <p className="mt-3 font-mono text-[10px] text-ash">
-                  {shortAddress(address, 6)} · simulated for fun, not real chain data
-                </p>
-                <Button
-                  size="sm"
-                  variant="crimson"
-                  className="mt-4"
-                  onClick={() =>
-                    shareOnX(
-                      `Just got rated ${status.tier.label} ${status.tier.emoji} on ansem.space with a ${status.score}/100 grip score. Check yours, paperhands:`
-                    )
-                  }
-                >
-                  <Share2 size={14} /> Flex status on X
-                </Button>
-              </motion.div>
-            ) : null}
 
-            {/* Calculator */}
+            <motion.div key={data.total} initial={{ opacity: 0.6 }} animate={{ opacity: 1 }} className="mt-5">
+              <p className="text-4xl">{tier.emoji}</p>
+              <p className={cn("mt-2 font-display text-2xl uppercase tracking-wide", tier.color)}>
+                {tier.label}
+              </p>
+              <p className="mt-1 text-sm text-ash">{tier.desc}</p>
+              <dl className="mt-5 grid grid-cols-3 gap-3 font-mono text-xs">
+                <div className="border border-edge px-3 py-2.5">
+                  <dt className="text-ash">Herd Points</dt>
+                  <dd className="mt-1 text-lg text-gold">{data.total.toLocaleString()}</dd>
+                </div>
+                <div className="border border-edge px-3 py-2.5">
+                  <dt className="text-ash">Rank</dt>
+                  <dd className="mt-1 text-lg text-bone">#{rank}</dd>
+                </div>
+                <div className="border border-edge px-3 py-2.5">
+                  <dt className="text-ash">Badges</dt>
+                  <dd className="mt-1 text-lg text-gold">
+                    {data.badges.length}/{BADGES.length}
+                  </dd>
+                </div>
+              </dl>
+              {address ? (
+                <p className="mt-3 font-mono text-[10px] text-ash">
+                  {shortAddress(address, 6)} · streak {data.streak} day{data.streak === 1 ? "" : "s"}
+                </p>
+              ) : (
+                <div className="mt-4">
+                  <Button size="sm" onClick={connect} disabled={connecting}>
+                    <Wallet size={14} /> {connecting ? "Connecting…" : "Connect to bind your status"}
+                  </Button>
+                </div>
+              )}
+              <Button
+                size="sm"
+                variant="crimson"
+                className="mt-4"
+                onClick={() =>
+                  shareOnX(
+                    `I'm ranked ${tier.label} ${tier.emoji} with ${data.total.toLocaleString()} Herd Points on ansem.space. Come take my rank:`
+                  )
+                }
+              >
+                <Share2 size={14} /> Flex status on X
+              </Button>
+            </motion.div>
+
+            {/* Bag calculator — live price */}
             <div className="mt-8 border-t border-edge pt-6">
               <h4 className="font-display text-xs uppercase tracking-widest text-bone">
-                What if you held from the airdrop?
+                What's your bag worth right now?
               </h4>
               <label className="mt-3 block font-mono text-[10px] uppercase tracking-[0.2em] text-ash">
-                Airdrop size: {(airdropAmount / 1e6).toFixed(1)}M $ANSEM
+                Bag size: {(bagTokens / 1e6).toFixed(1)}M $ANSEM
               </label>
               <input
                 type="range"
                 min={100000}
                 max={20000000}
                 step={100000}
-                value={airdropAmount}
-                onChange={(e) => setAirdropAmount(Number(e.target.value))}
+                value={bagTokens}
+                onChange={(e) => setBagTokens(Number(e.target.value))}
                 className="mt-2 w-full accent-gold"
               />
-              <div className="mt-4 grid grid-cols-2 gap-3 text-center">
-                <div className="border border-crimson/40 bg-crimson/5 px-3 py-4">
-                  <p className="font-mono text-[10px] uppercase tracking-widest text-crimson">Sold day one</p>
-                  <p className="mt-1 font-display text-xl text-crimson">{formatUsd(soldValue)}</p>
-                  <p className="mt-1 text-[10px] text-ash">…enjoy the kebab</p>
-                </div>
-                <div className="border border-gold/40 bg-gold/5 px-3 py-4">
-                  <p className="font-mono text-[10px] uppercase tracking-widest text-gold">Held the line</p>
-                  <p className="mt-1 font-display text-xl text-gold">{formatUsd(heldValue)}</p>
-                  <p className="mt-1 text-[10px] text-ash">{(heldValue / Math.max(soldValue, 0.01)).toFixed(1)}x the paper path</p>
-                </div>
+              <div className="mt-4 border border-gold/40 bg-gold/5 px-4 py-4 text-center">
+                <p className="font-mono text-[10px] uppercase tracking-widest text-gold">
+                  Live value {market.live ? "· DexScreener" : "· connecting…"}
+                </p>
+                <p className="mt-1 font-display text-2xl text-gold">
+                  {market.live ? formatUsd(bagValue) : "—"}
+                </p>
+                <p className="mt-1 text-[10px] text-ash">
+                  at ${market.price < 0.001 ? market.price.toFixed(7) : market.price.toFixed(4)} ·{" "}
+                  {market.change24h >= 0 ? "+" : ""}
+                  {market.change24h.toFixed(1)}% today
+                </p>
               </div>
             </div>
           </motion.div>
 
-          {/* Halls */}
+          {/* Live halls */}
           <motion.div
             initial={{ opacity: 0, y: 24 }}
             whileInView={{ opacity: 1, y: 0 }}
@@ -328,43 +338,74 @@ export function Hands() {
           >
             <div className="border border-edge bg-panel p-6 shadow-panel [clip-path:polygon(14px_0,100%_0,100%_calc(100%-14px),calc(100%-14px)_100%,0_100%,0_14px)]">
               <h3 className="font-display text-sm uppercase tracking-widest text-gold">
-                💎 Hall of Fame — Diamond Division
+                💎 Diamond Division — Top Holders
               </h3>
+              <p className="mt-1 font-mono text-[10px] text-ash">
+                {live
+                  ? "Live from the Solana chain via Helius · the largest wallet is usually the liquidity pool"
+                  : "Loading chain data…"}
+              </p>
               <div className="mt-4 space-y-3">
-                {HALL_OF_FAME.map((h) => (
-                  <div key={h.name} className="flex items-start justify-between gap-3 border-b border-edge/50 pb-3 last:border-0 last:pb-0">
-                    <div>
-                      <p className="font-mono text-xs text-bone">@{h.name}</p>
-                      <p className="mt-0.5 text-[11px] text-ash">{h.note}</p>
-                      <p className="mt-0.5 font-mono text-[10px] text-ash">{h.held} · {h.bag}</p>
+                {holders.length === 0 && (
+                  <p className="py-4 text-center font-mono text-xs text-ash">Reading the chain…</p>
+                )}
+                {holders.map((h, i) => (
+                  <div
+                    key={`${h.label}-${i}`}
+                    className="flex items-center justify-between gap-3 border-b border-edge/50 pb-3 last:border-0 last:pb-0"
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className={cn("font-mono text-xs", i === 0 ? "text-gold" : "text-ash")}>
+                        {i + 1}
+                      </span>
+                      <p className="font-mono text-xs text-bone">{h.label}</p>
+                      {i === 0 && <span className="text-xs">👑</span>}
                     </div>
-                    <span className="shrink-0 font-mono text-xs text-gold">{h.gain}</span>
+                    <span className="shrink-0 font-mono text-xs text-gold">{h.pct.toFixed(2)}% of supply</span>
                   </div>
                 ))}
               </div>
             </div>
 
             <div className="border border-crimson/30 bg-panel p-6 shadow-panel [clip-path:polygon(14px_0,100%_0,100%_calc(100%-14px),calc(100%-14px)_100%,0_100%,0_14px)]">
-              <h3 className="font-display text-sm uppercase tracking-widest text-crimson">
-                🧻 Hall of Shame — Paperhand Memorial
+              <h3 className="font-display text-sm uppercase tracking-widest text-crimson-bright">
+                🧻 Paperhand Memorial — Recent Sells
               </h3>
-              <p className="mt-1 text-[11px] text-ash">Gone, but not forgotten. Mostly forgotten.</p>
+              <p className="mt-1 font-mono text-[10px] text-ash">
+                Real sells from the whale feed. Gone, but not forgotten. Mostly forgotten.
+              </p>
               <div className="mt-4 space-y-3">
-                {HALL_OF_SHAME.map((h) => (
-                  <div key={h.name} className="flex items-start justify-between gap-3 border-b border-edge/50 pb-3 last:border-0 last:pb-0">
-                    <div>
-                      <p className="font-mono text-xs text-bone">@{h.name}</p>
-                      <p className="mt-0.5 text-[11px] text-ash">
-                        Sold {h.sold} for {h.got}. {h.note}
+                {sells.length === 0 ? (
+                  <p className="py-3 text-center text-xs text-gold">
+                    No recent sells detected — the herd holds. 💎
+                  </p>
+                ) : (
+                  sells.map((s, i) => (
+                    <div
+                      key={`${s.wallet}-${i}`}
+                      className="flex items-start justify-between gap-3 border-b border-edge/50 pb-3 last:border-0 last:pb-0"
+                    >
+                      <p className="font-mono text-xs text-bone">
+                        {s.wallet}
+                        <span className="mt-0.5 block text-[11px] text-ash">
+                          paper-handed {formatCompact(s.amount)} $ANSEM
+                        </span>
                       </p>
+                      <span className="shrink-0 font-mono text-[10px] text-crimson-bright">SOLD</span>
                     </div>
-                    <span className="shrink-0 font-mono text-xs text-crimson">{h.missed}</span>
-                  </div>
-                ))}
+                  ))
+                )}
               </div>
             </div>
 
-            <Button size="lg" className="w-full" onClick={() => { setCardUrl(null); setStoryOpen(true); }}>
+            <Button
+              size="lg"
+              className="w-full"
+              onClick={() => {
+                setCardUrl(null);
+                setStoryOpen(true);
+              }}
+            >
               <Gem size={16} /> Share your diamond hands story
             </Button>
           </motion.div>
@@ -413,12 +454,15 @@ export function Hands() {
               <Button
                 variant="crimson"
                 className="flex-1"
-                onClick={() => shareOnX(`My diamond hands story 💎🙌 "${storyText.slice(0, 120)}" — forged at`) }
+                onClick={() => shareOnX(`My diamond hands story 💎🙌 "${storyText.slice(0, 120)}" — forged at`)}
               >
                 <Share2 size={14} /> Share to X
               </Button>
             </div>
-            <button onClick={() => setCardUrl(null)} className="w-full text-center font-mono text-xs text-ash hover:text-bone">
+            <button
+              onClick={() => setCardUrl(null)}
+              className="w-full text-center font-mono text-xs text-ash hover:text-bone"
+            >
               ← Edit story
             </button>
           </div>

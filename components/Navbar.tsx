@@ -8,9 +8,10 @@ import { Button } from "@/components/ui/button";
 import { useHerd } from "@/components/HerdProvider";
 import { useMarket } from "@/components/MarketProvider";
 import { useWallet } from "@/components/WalletProvider";
+import { LINKS } from "@/lib/constants";
 import { BADGES } from "@/lib/points";
 import { triggerBullCharge } from "@/lib/confetti";
-import { cn, formatUsd, shortAddress } from "@/lib/utils";
+import { cn, shortAddress } from "@/lib/utils";
 
 const NAV_LINKS = [
   { href: "#forge", label: "Forge" },
@@ -32,17 +33,23 @@ function PriceTicker() {
     >
       <span className={cn("h-1.5 w-1.5 rounded-full", live ? "animate-pulseglow bg-gold" : "bg-ash/50")} />
       <span className="text-ash">$ANSEM</span>
-      <motion.span
-        key={price}
-        initial={{ opacity: 0.4 }}
-        animate={{ opacity: 1 }}
-        className={cn("tabular-nums", up ? "text-gold" : "text-crimson-bright")}
-      >
-        ${price < 0.001 ? price.toFixed(7) : price.toFixed(6)}
-      </motion.span>
-      <span className={cn("tabular-nums", up ? "text-gold" : "text-crimson-bright")}>
-        {up ? "▲" : "▼"} {Math.abs(change24h).toFixed(2)}%
-      </span>
+      {live ? (
+        <>
+          <motion.span
+            key={price}
+            initial={{ opacity: 0.4 }}
+            animate={{ opacity: 1 }}
+            className={cn("tabular-nums", up ? "text-gold" : "text-crimson-bright")}
+          >
+            ${price < 0.001 ? price.toFixed(7) : price.toFixed(4)}
+          </motion.span>
+          <span className={cn("tabular-nums", up ? "text-gold" : "text-crimson-bright")}>
+            {up ? "▲" : "▼"} {Math.abs(change24h).toFixed(2)}%
+          </span>
+        </>
+      ) : (
+        <span className="text-ash/60">loading…</span>
+      )}
     </div>
   );
 }
@@ -219,6 +226,16 @@ export function Navbar() {
               {l.label}
             </a>
           ))}
+          {/* Creator credit */}
+          <a
+            href={LINKS.creatorX}
+            target="_blank"
+            rel="noopener noreferrer"
+            title="Site creator"
+            className="ml-2 border-l border-edge py-1 pl-3 font-mono text-[10px] text-ash/70 transition-colors hover:text-gold"
+          >
+            by @DannyMD_UK
+          </a>
         </nav>
 
         <div className="flex items-center gap-2">
@@ -257,6 +274,15 @@ export function Navbar() {
                   {l.label}
                 </motion.a>
               ))}
+              <a
+                href={LINKS.creatorX}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => setMenuOpen(false)}
+                className="pt-4 font-mono text-[11px] text-ash transition-colors hover:text-gold"
+              >
+                Built by 𝕏 @DannyMD_UK for the $ANSEM community
+              </a>
             </div>
           </motion.nav>
         )}

@@ -188,8 +188,9 @@ export function mergeGuestInto(address: string) {
 }
 
 /* ------------------------------------------------------------------ */
-/* Simulated competitors so the leaderboard feels alive from day one.   */
-/* Replace with a server-backed board later without touching the UI.    */
+/* Local leaderboard: every real player profile stored on this device.  */
+/* (One per wallet + guest.) A server-backed global board can replace   */
+/* this function without touching the UI.                               */
 /* ------------------------------------------------------------------ */
 
 export interface HerdEntry {
@@ -199,20 +200,33 @@ export interface HerdEntry {
   isYou?: boolean;
 }
 
-export const FAKE_HERD: HerdEntry[] = [
-  { name: "blknoiz_disciple", total: 14820, weekly: 980 },
-  { name: "HoofDaddy", total: 12140, weekly: 1240 },
-  { name: "solana_stampede", total: 9860, weekly: 640 },
-  { name: "grandma_sol", total: 8420, weekly: 310 },
-  { name: "bullmonk.sol", total: 7150, weekly: 890 },
-  { name: "line_holder", total: 5930, weekly: 470 },
-  { name: "wagmi_wanda", total: 4480, weekly: 720 },
-  { name: "bearhunter.sol", total: 3120, weekly: 260 },
-  { name: "kebab_regret", total: 1870, weekly: 150 },
-  { name: "fresh_hoof", total: 640, weekly: 90 },
-];
+const KEY_PREFIX = "ansem_herd_";
 
-export function computeRank(total: number, mode: "total" | "weekly" = "total", weekly = 0): number {
-  const mine = mode === "total" ? total : weekly;
-  return 1 + FAKE_HERD.filter((e) => (mode === "total" ? e.total : e.weekly) > mine).length;
+export function listLocalPlayers(currentAddress: string | null): HerdEntry[] {
+  if (typeof window === "undefined") return [];
+  const meKey = currentAddress ?? "guest";
+  const wk = weekKey();
+  const entries: HerdEntry[] = [];
+  for (let i = 0; i < window.localStorage.length; i++) {
+    const key = window.localStorage.key(i);
+    if (!key?.startsWith(KEY_PREFIX)) continue;
+    const id = key.slice(KEY_PREFIX.length);
+    const d = store.get<PlayerData | null>(key, null);
+    if (!d) continue;
+    entries.push({
+      name: id === "guest" ? "Guest" : `${id.slice(0, 4)}…${id.slice(-4)}`,
+      total: d.total,
+      weekly: d.weekly[wk] ?? 0,
+      isYou: id === meKey,
+    });
+  }
+  return entries.sort((a, b) => b.total - a.total);
+}
+
+export function computeRank(
+  players: HerdEntry[],
+  mine: number,
+  mode: "total" | "weekly" = "total"
+): number {
+  return 1 + players.filter((e) => !e.isYou && (mode === "total" ? e.total : e.weekly) > mine).length;
 }

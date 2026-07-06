@@ -7,14 +7,14 @@
  * structured so a server-backed board can drop in later.
  */
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { Award, Crown, Flame, TrendingUp, Wallet } from "lucide-react";
 import { SectionHeader } from "@/components/SectionHeader";
 import { Button } from "@/components/ui/button";
 import { useHerd } from "@/components/HerdProvider";
 import { useWallet } from "@/components/WalletProvider";
-import { BADGES, FAKE_HERD, weekKey } from "@/lib/points";
+import { BADGES, listLocalPlayers, weekKey, type HerdEntry } from "@/lib/points";
 import { cn, shortAddress } from "@/lib/utils";
 
 const EARN_METHODS = [
@@ -31,11 +31,18 @@ export function Herd() {
   const { data, weeklyPoints, rank, weeklyRank } = useHerd();
   const [tab, setTab] = useState<"total" | "weekly">("total");
 
+  // Real profiles stored on this device (guest + every wallet that played).
+  const [players, setPlayers] = useState<HerdEntry[]>([]);
+  useEffect(() => {
+    setPlayers(listLocalPlayers(address));
+  }, [address, data.total]);
+
   const youName = address ? shortAddress(address) : "You (guest)";
-  const board = [
-    ...FAKE_HERD,
-    { name: youName, total: data.total, weekly: weeklyPoints, isYou: true },
-  ]
+  const board = (
+    players.some((p) => p.isYou)
+      ? players
+      : [...players, { name: youName, total: data.total, weekly: weeklyPoints, isYou: true }]
+  )
     .sort((a, b) => (tab === "total" ? b.total - a.total : b.weekly - a.weekly))
     .slice(0, 12);
 
@@ -112,7 +119,8 @@ export function Herd() {
               })}
             </ol>
             <p className="px-5 py-3 font-mono text-[10px] text-ash/70">
-              Local leaderboard (simulated competitors) — global on-chain board coming soon.
+              Real scores, stored on this device — a global on-chain board is next. Every wallet
+              that plays here gets its own row.
             </p>
           </motion.div>
 
