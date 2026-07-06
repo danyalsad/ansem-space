@@ -90,12 +90,12 @@ export function Quests() {
   const weeklyComplete = quests.filter((q) => q.quest.period === "weekly" && q.complete).length;
 
   return (
-    <section id="quests" className="relative scroll-mt-16 border-t border-edge/50 bg-void py-20 sm:py-28">
-      <div className="mx-auto max-w-7xl px-4 sm:px-6">
+    <section id="quests" className="section-shell">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <SectionHeader
-          kicker="Retention — Daily Missions"
+          kicker="Daily missions"
           title="Bull Quests"
-          sub="Complete daily and weekly missions to stack Herd Points, unlock badges, and climb the board. The herd rewards those who show up."
+          sub="Complete daily and weekly missions to stack Herd Points, unlock badges, and climb the board."
         />
 
         <p className="-mt-8 mb-10 text-center font-mono text-[10px] uppercase tracking-[0.3em] text-gold/70">

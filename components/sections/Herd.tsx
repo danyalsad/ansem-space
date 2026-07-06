@@ -79,12 +79,12 @@ export function Herd() {
   }
 
   return (
-    <section id="herd" className="relative scroll-mt-16 border-t border-edge/50 bg-abyss/40 py-20 sm:py-28">
-      <div className="mx-auto max-w-7xl px-4 sm:px-6">
+    <section id="herd" className="section-shell section-glow">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <SectionHeader
-          kicker="Gamification — Herd Points"
+          kicker="Herd points"
           title="The Herd"
-          sub="Everything you do here earns Herd Points (HP) tied to your wallet. Climb the board, collect badges, defend your rank. The herd remembers who showed up."
+          sub="Everything you do earns HP tied to your wallet. Climb the board, collect badges, defend your rank."
         />
 
         <div className="grid gap-8 lg:grid-cols-[1fr_380px]">

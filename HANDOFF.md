@@ -4,7 +4,7 @@
 > recent state before pushing.** A stale handoff is worse than none — treat
 > updating it as part of the commit, not an afterthought.
 
-Last updated: 2026-07-06 · v9 arcade engagement overhaul (zones, sfx, new obstacles)
+Last updated: 2026-07-06 · v10 design system overhaul (2026 visual refresh)
 
 ## What this is
 
@@ -25,7 +25,7 @@ Tagline: *Forge Memes. Charge Forward. Hold the Line.*
 
 ## Stack
 
-Next.js 14 App Router · TypeScript · Tailwind (custom tokens: void/abyss/panel/edge/gold/crimson/bone/ash) · framer-motion · @solana/wallet-adapter (Phantom + Solflare, real mainnet connect) · Fonts: Unbounded / Chakra Petch / JetBrains Mono via next/font/google.
+Next.js 14 App Router · TypeScript · Tailwind (void/abyss/panel/surface/edge/gold/crimson/bone/ash/mist) · framer-motion · @solana/wallet-adapter · Fonts: Bricolage Grotesque / Plus Jakarta Sans / IBM Plex Mono via next/font/google.
 
 Data + infra:
 - **DexScreener** (no key): price/mcap/volume/24h change/buys/sells — `components/MarketProvider.tsx`, 30s poll, deepest-liquidity pair.
@@ -70,7 +70,8 @@ route rewrites the URL to `sslmode=no-verify`. Don't remove that.
 - `app/admin/page.tsx` — creator-wallet-gated asset manager (slot cards + free library). No footer link — navigate to /admin directly.
 - `components/HerdProvider.tsx` — earn() + grantBonus() + toasts, quest progress on earn, daily auto-claim, guest merge, debounced Supabase sync
 - `components/Atmosphere.tsx` — global cinematic background layers
-- `components/ui/Panel.tsx` — horn-clip premium panels (gold/crimson/glass variants)
+- `components/ui/Panel.tsx` — rounded glass panels (gold/crimson/glass + gradient-border variant)
+- `app/globals.css` — surface-card, gradient-border, section-shell utilities; aurora bg (no cyber-grid clutter)
 - `components/CreatorSpotlight.tsx` — "Built by Dr Danny" hero banner + Hall of Builders (#builders)
 - `components/AchievementRoadmap.tsx` — visual HP milestones + badge progress grid
 - `components/sections/Charge.tsx` — Arcade hub: Charge runner, Bull Tap, Hold the Line; shared stampede board

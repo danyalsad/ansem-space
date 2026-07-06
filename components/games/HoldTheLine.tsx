@@ -155,7 +155,7 @@ export function HoldTheLine({ onEnd }: { onEnd?: (score: number) => void }) {
   const inDiamond = pressure >= 72 && pressure <= 94;
 
   return (
-    <div className="border border-gold/25 bg-panel horn-clip overflow-hidden">
+    <div className="overflow-hidden rounded-2xl border border-white/10 bg-surface/80">
       <canvas ref={canvasRef} width={600} height={120} className="block w-full opacity-80" />
 
       <div className="p-6 sm:p-8">

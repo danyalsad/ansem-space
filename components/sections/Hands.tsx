@@ -239,12 +239,12 @@ export function Hands() {
   }
 
   return (
-    <section id="hands" className="relative scroll-mt-16 py-20 sm:py-28">
-      <div className="mx-auto max-w-7xl px-4 sm:px-6">
+    <section id="hands" className="section-shell">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <SectionHeader
-          kicker="Section 03 — Culture"
-          title="Hands"
-          sub="This coin runs on grip strength. Live market stats, your real standing in the herd, and the wallets actually holding the line — straight from the chain."
+          kicker="Culture"
+          title="Diamond Hands"
+          sub="Live market stats, your standing in the herd, and the wallets holding the line — straight from chain."
         />
 
         {/* Live market stats via DexScreener */}

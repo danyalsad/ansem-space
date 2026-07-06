@@ -4,13 +4,12 @@ import type { ReactNode } from "react";
 type PanelVariant = "default" | "gold" | "crimson" | "glass";
 
 const variants: Record<PanelVariant, string> = {
-  default: "border-edge bg-panel/90",
-  gold: "border-gold/35 bg-panel/95 shadow-gold-glow",
-  crimson: "border-crimson/35 bg-panel/95",
-  glass: "border-white/[0.06] bg-panel/60 backdrop-blur-xl",
+  default: "border-white/[0.06] bg-surface/90",
+  gold: "gradient-border bg-panel/95 shadow-gold-glow",
+  crimson: "border-crimson/25 bg-panel/95",
+  glass: "border-white/[0.08] bg-panel/50 backdrop-blur-xl",
 };
 
-/** Premium horn-clipped panel — the core surface of ANSEM Space v7. */
 export function Panel({
   children,
   className,
@@ -25,9 +24,9 @@ export function Panel({
   return (
     <div
       className={cn(
-        "relative border shadow-panel horn-clip",
+        "relative rounded-2xl border shadow-panel",
         variants[variant],
-        glow && "before:pointer-events-none before:absolute before:inset-0 before:bg-gradient-to-br before:from-gold/[0.07] before:via-transparent before:to-crimson/[0.04]",
+        glow && "before:pointer-events-none before:absolute before:inset-0 before:rounded-2xl before:bg-gradient-to-br before:from-gold/[0.06] before:via-transparent before:to-crimson/[0.03]",
         className
       )}
     >

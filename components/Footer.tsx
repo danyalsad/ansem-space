@@ -12,117 +12,81 @@ import {
 
 export function Footer() {
   return (
-    <footer className="border-t border-gold/15 bg-abyss">
-      <div className="mx-auto max-w-7xl px-4 py-14 sm:px-6">
-        <div className="grid gap-10 md:grid-cols-3">
+    <footer className="border-t border-white/[0.05] bg-abyss">
+      <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
+        <div className="grid gap-12 md:grid-cols-3">
           <div>
-            <div className="flex items-center gap-2.5">
+            <div className="flex items-center gap-3">
               <BullLogo className="h-10 w-10" />
-              <span className="font-display text-sm uppercase tracking-widest text-bone">
+              <span className="font-display text-lg font-semibold text-bone">
                 ANSEM<span className="text-gold"> Space</span>
               </span>
             </div>
-            <p className="mt-4 font-display text-[11px] uppercase tracking-[0.2em] text-ash">
-              {TAGLINE}
-            </p>
-            <div className="mt-5">
+            <p className="mt-4 text-sm leading-relaxed text-ash">{TAGLINE}</p>
+            <div className="mt-6">
               <ContractAddress full className="max-w-full" />
             </div>
           </div>
 
           <div>
-            <h4 className="font-display text-xs uppercase tracking-[0.3em] text-gold">
-              Trade $ANSEM
-            </h4>
-            <div className="mt-4 flex flex-col gap-3">
-              <a
-                href={LINKS.pumpFun}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex w-fit items-center gap-2 border border-gold/30 px-4 py-2.5 font-display text-xs uppercase tracking-wider text-gold transition-all hover:border-gold hover:shadow-gold-glow [clip-path:polygon(8px_0,100%_0,100%_calc(100%-8px),calc(100%-8px)_100%,0_100%,0_8px)]"
-              >
-                🚀 Trade on pump.fun
-              </a>
-              <a
-                href={LINKS.jupiter}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex w-fit items-center gap-2 border border-gold/30 px-4 py-2.5 font-display text-xs uppercase tracking-wider text-gold transition-all hover:border-gold hover:shadow-gold-glow [clip-path:polygon(8px_0,100%_0,100%_calc(100%-8px),calc(100%-8px)_100%,0_100%,0_8px)]"
-              >
-                🪐 Swap on Jupiter
-              </a>
-              <a
-                href={LINKS.ansemX}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex w-fit items-center gap-2 border border-edge px-4 py-2.5 font-display text-xs uppercase tracking-wider text-ash transition-all hover:border-bone hover:text-bone [clip-path:polygon(8px_0,100%_0,100%_calc(100%-8px),calc(100%-8px)_100%,0_100%,0_8px)]"
-              >
-                𝕏 Ansem @blknoiz06
-              </a>
+            <h4 className="font-display text-sm font-semibold text-bone">Trade $ANSEM</h4>
+            <div className="mt-4 flex flex-col gap-2">
+              {[
+                { href: LINKS.pumpFun, label: "Trade on pump.fun", emoji: "🚀" },
+                { href: LINKS.jupiter, label: "Swap on Jupiter", emoji: "🪐" },
+                { href: LINKS.ansemX, label: "Ansem on X", emoji: "𝕏" },
+              ].map((l) => (
+                <a
+                  key={l.href}
+                  href={l.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex w-fit items-center gap-2 rounded-full border border-white/10 px-4 py-2.5 text-sm text-ash transition-all hover:border-gold/30 hover:text-gold"
+                >
+                  {l.emoji} {l.label}
+                </a>
+              ))}
             </div>
           </div>
 
           <div>
-            <h4 className="font-display text-xs uppercase tracking-[0.3em] text-gold">
-              The fine print
-            </h4>
-            <p className="mt-4 text-xs leading-relaxed text-ash">
-              ANSEM Space is a <span className="text-bone">community-built fan site</span>. It is
-              not affiliated with, endorsed by, or operated by Ansem (@blknoiz06). Market data is
-              provided by DexScreener and on-chain data by Helius; Herd Points and game scores are
-              stored locally in your browser. $ANSEM is a meme coin with no intrinsic value or
-              expectation of financial return. Nothing here is financial advice — never invest
-              more than you can afford to lose.
+            <h4 className="font-display text-sm font-semibold text-bone">Disclaimer</h4>
+            <p className="mt-4 text-sm leading-relaxed text-mist">
+              Community-built fan site — not affiliated with Ansem (@blknoiz06). Market data via
+              DexScreener; on-chain via Helius. $ANSEM is a meme coin with no intrinsic value.
+              Not financial advice.
             </p>
           </div>
         </div>
 
-        {/* Creator hero banner */}
-        <div className="mt-12 border border-gold/30 bg-panel p-6 shadow-gold-glow sm:p-8">
+        <div className="mt-14 gradient-border rounded-3xl p-6 sm:p-8">
           <div className="flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <p className="font-mono text-[10px] uppercase tracking-[0.35em] text-crimson">
-                Chief Builder · Hall of Builders #1
-              </p>
-              <h4 className="mt-2 font-display text-xl uppercase tracking-wide text-bone sm:text-2xl">
-                {CREATOR_NAME}
-              </h4>
+              <p className="font-mono text-xs text-gold">Chief Builder</p>
+              <h4 className="mt-1 font-display text-2xl font-bold text-bone">{CREATOR_NAME}</h4>
               <p className="mt-2 max-w-xl text-sm leading-relaxed text-ash">{CREATOR_STORY}</p>
-              <p className="mt-3 font-display text-xs uppercase tracking-[0.2em] text-gold">
-                {CREATOR_TAGLINE}
-              </p>
+              <p className="mt-3 text-sm font-medium text-gold">{CREATOR_TAGLINE}</p>
             </div>
             <div className="flex shrink-0 flex-col gap-3">
               <a
                 href={LINKS.creatorX}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center justify-center gap-2 border border-gold/50 bg-gold/10 px-5 py-3 font-display text-xs uppercase tracking-wider text-gold transition-all hover:border-gold hover:shadow-gold-glow"
+                className="inline-flex items-center justify-center gap-2 rounded-full border border-gold/40 bg-gold/10 px-5 py-3 text-sm font-medium text-gold transition-all hover:bg-gold/20"
               >
                 𝕏 {CREATOR_HANDLE}
               </a>
-              <span className="text-center font-mono text-[10px] text-ash">
+              <span className="text-center font-mono text-[10px] text-mist">
                 {CREATOR_WALLET.slice(0, 8)}…{CREATOR_WALLET.slice(-6)}
               </span>
             </div>
           </div>
         </div>
 
-        <div className="mt-8 border-t border-edge/60 pt-8">
-          <h4 className="font-display text-xs uppercase tracking-[0.3em] text-gold">Credits</h4>
-          <div className="mt-4 flex flex-col gap-2.5 text-xs text-ash">
-            <span>
-              Built for the <span className="text-gold">$ANSEM</span> community 🐂
-            </span>
-            <a href="#builders" className="font-mono text-gold transition-colors hover:text-gold-glow">
-              Hall of Builders →
-            </a>
-          </div>
-        </div>
-
-        <div className="mt-8 flex flex-col items-center justify-between gap-3 border-t border-edge/60 pt-6 text-[11px] text-ash sm:flex-row">
-          <span>© 2026 ANSEM Space · Built by the herd 🐂</span>
-          <span className="font-mono">ansem.space — hold the line.</span>
+        <div className="mt-10 flex flex-col items-center justify-between gap-3 border-t border-white/[0.05] pt-8 text-sm text-mist sm:flex-row">
+          <span>© 2026 ANSEM Space</span>
+          <a href="#builders" className="text-gold hover:text-gold-glow">Hall of Builders</a>
+          <span className="font-mono text-xs">ansem.space</span>
         </div>
       </div>
     </footer>

@@ -1113,7 +1113,7 @@ export function ChargeRunner({
     <div>
       <div
         ref={wrapRef}
-        className={cn("relative overflow-hidden border-2 border-gold/30 bg-black horn-clip", shake && "animate-[shake_0.4s_ease-in-out]")}
+        className={cn("relative overflow-hidden rounded-2xl border border-white/10 bg-black shadow-panel", shake && "animate-[shake_0.4s_ease-in-out]")}
       >
         <canvas ref={canvasRef} className="block w-full touch-none select-none" />
 
@@ -1200,7 +1200,7 @@ export function ChargeRunner({
         onPointerUp={jumpUp}
         onPointerLeave={jumpUp}
         className={cn(
-          "mt-3 w-full border-2 py-5 font-display text-lg uppercase tracking-[0.35em] transition-all select-none touch-manipulation horn-clip-sm",
+          "mt-3 w-full rounded-2xl border py-5 font-display text-base font-semibold tracking-wide transition-all select-none touch-manipulation",
           phase === "running" || phase === "countdown"
             ? "border-gold bg-gold/15 text-gold active:scale-[0.98] active:bg-gold/30 active:shadow-gold-glow"
             : "border-edge bg-panel text-ash/40"
@@ -1220,7 +1220,7 @@ export function ChargeRunner({
         <span className="ml-auto font-mono text-xs text-ash">Best <span className="text-gold">{highScore.toLocaleString()}</span></span>
       </div>
 
-      <div className={cn("mt-3 flex items-center justify-between gap-4 border px-4 py-3 horn-clip-sm", dailyDone ? "border-gold/50 bg-gold/10" : "border-edge bg-panel")}>
+      <div className={cn("mt-3 flex items-center justify-between gap-4 rounded-2xl border px-4 py-3", dailyDone ? "border-gold/35 bg-gold/[0.06]" : "border-white/[0.06] bg-surface/80")}>
         <div>
           <p className="font-mono text-[10px] uppercase tracking-widest text-crimson">Daily challenge</p>
           <p className="mt-0.5 text-sm text-bone">{daily.current.label}</p>

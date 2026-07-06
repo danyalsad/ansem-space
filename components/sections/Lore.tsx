@@ -174,12 +174,12 @@ export function Lore() {
   }, [storyMode, storyIndex, earn]);
 
   return (
-    <section id="lore" className="relative scroll-mt-16 border-t border-edge/50 bg-abyss/40 py-20 sm:py-28">
-      <div className="mx-auto max-w-5xl px-4 sm:px-6">
+    <section id="lore" className="section-shell">
+      <div className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8">
         <SectionHeader
-          kicker="Section 04 — The Archive"
+          kicker="Archive"
           title="Lore"
-          sub="Every bull has an origin story. From the pump.fun genesis block to the airdrops that made grown degens cry — this is the sacred timeline of $ANSEM."
+          sub="From the pump.fun genesis block to the airdrops that made grown degens cry — the timeline of $ANSEM."
         />
 
         <div className="mb-10">

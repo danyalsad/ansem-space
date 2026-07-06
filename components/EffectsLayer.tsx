@@ -53,7 +53,7 @@ export function EffectsLayer() {
             </motion.div>
           ))}
           <motion.p
-            className="absolute inset-x-0 top-1/2 -translate-y-1/2 text-center font-display text-3xl uppercase tracking-widest text-gold sm:text-6xl"
+            className="absolute inset-x-0 top-1/2 -translate-y-1/2 text-center font-display text-3xl font-bold text-gold sm:text-6xl"
             initial={{ opacity: 0, scale: 0.7 }}
             animate={{ opacity: [0, 1, 1, 0], scale: [0.7, 1.05, 1, 1.1] }}
             transition={{ duration: 2.2, times: [0, 0.2, 0.8, 1] }}

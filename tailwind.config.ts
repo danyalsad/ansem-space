@@ -1,11 +1,5 @@
 import type { Config } from "tailwindcss";
 
-/**
- * ANSEM Space — dark cyber-bull design system.
- * void   = near-black base
- * gold   = molten gold accent (primary)
- * crimson= aggression / danger accent
- */
 const config: Config = {
   content: [
     "./app/**/*.{ts,tsx}",
@@ -15,10 +9,11 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        void: "#0A0A0A",
-        abyss: "#111013",
-        panel: "#141317",
-        edge: "#26232B",
+        void: "#050506",
+        abyss: "#0C0B0F",
+        panel: "#121116",
+        surface: "#18171D",
+        edge: "#2A2833",
         gold: {
           DEFAULT: "#D4AF37",
           dim: "#8C7326",
@@ -29,20 +24,25 @@ const config: Config = {
           bright: "#FF2E2E",
           dim: "#6E0A19",
         },
-        bone: "#F2EFE9",
-        ash: "#9A95A3",
+        bone: "#F4F2EC",
+        ash: "#9B97A8",
+        mist: "#6E6A78",
         ember: "#1A1218",
       },
       fontFamily: {
-        display: ["var(--font-display)", "sans-serif"],
-        body: ["var(--font-body)", "sans-serif"],
-        mono: ["var(--font-mono)", "monospace"],
+        display: ["var(--font-display)", "system-ui", "sans-serif"],
+        body: ["var(--font-body)", "system-ui", "sans-serif"],
+        mono: ["var(--font-mono)", "ui-monospace", "monospace"],
+      },
+      borderRadius: {
+        "4xl": "2rem",
       },
       boxShadow: {
-        "gold-glow": "0 0 32px rgba(212,175,55,0.3), 0 0 80px rgba(212,175,55,0.1), inset 0 1px 0 rgba(237,203,106,0.15)",
-        "crimson-glow": "0 0 28px rgba(200,16,46,0.4), 0 0 60px rgba(200,16,46,0.12)",
-        panel: "0 1px 0 rgba(255,255,255,0.05) inset, 0 1px 0 rgba(212,175,55,0.06), 0 20px 50px rgba(0,0,0,0.55)",
-        "panel-lift": "0 24px 60px rgba(0,0,0,0.65), 0 0 0 1px rgba(212,175,55,0.08)",
+        "gold-glow": "0 0 40px rgba(212,175,55,0.22), 0 0 100px rgba(212,175,55,0.06)",
+        "crimson-glow": "0 0 32px rgba(200,16,46,0.35)",
+        panel: "0 1px 0 rgba(255,255,255,0.04) inset, 0 24px 48px rgba(0,0,0,0.45)",
+        "panel-lift": "0 32px 64px rgba(0,0,0,0.55), 0 0 0 1px rgba(255,255,255,0.04)",
+        float: "0 8px 32px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.05)",
       },
       keyframes: {
         marquee: {
@@ -51,32 +51,28 @@ const config: Config = {
         },
         floaty: {
           "0%, 100%": { transform: "translateY(0px)" },
-          "50%": { transform: "translateY(-14px)" },
+          "50%": { transform: "translateY(-12px)" },
         },
         pulseglow: {
-          "0%, 100%": { opacity: "0.5" },
+          "0%, 100%": { opacity: "0.45" },
           "50%": { opacity: "1" },
         },
-        scanline: {
-          "0%": { transform: "translateY(-100%)" },
-          "100%": { transform: "translateY(100vh)" },
+        aurora: {
+          "0%, 100%": { transform: "translate(0, 0) scale(1)" },
+          "33%": { transform: "translate(2%, -2%) scale(1.04)" },
+          "66%": { transform: "translate(-2%, 1%) scale(0.98)" },
         },
-        shimmer: {
-          "0%": { backgroundPosition: "0% center" },
-          "100%": { backgroundPosition: "200% center" },
-        },
-        "pulse-ring": {
-          "0%, 100%": { transform: "scale(1)", opacity: "0.4" },
-          "50%": { transform: "scale(1.05)", opacity: "0.8" },
+        "fade-up": {
+          "0%": { opacity: "0", transform: "translateY(16px)" },
+          "100%": { opacity: "1", transform: "translateY(0)" },
         },
       },
       animation: {
-        marquee: "marquee 28s linear infinite",
-        floaty: "floaty 5s ease-in-out infinite",
-        pulseglow: "pulseglow 2.4s ease-in-out infinite",
-        scanline: "scanline 9s linear infinite",
-        shimmer: "shimmer 6s linear infinite",
-        "pulse-ring": "pulse-ring 3s ease-in-out infinite",
+        marquee: "marquee 32s linear infinite",
+        floaty: "floaty 6s ease-in-out infinite",
+        pulseglow: "pulseglow 2.5s ease-in-out infinite",
+        aurora: "aurora 18s ease-in-out infinite",
+        "fade-up": "fade-up 0.7s cubic-bezier(0.22, 1, 0.36, 1) forwards",
       },
     },
   },

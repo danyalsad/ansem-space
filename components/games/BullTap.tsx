@@ -295,7 +295,7 @@ export function BullTap({ onEnd }: { onEnd?: (score: number) => void }) {
     <div>
       <div
         className={cn(
-          "relative cursor-crosshair border border-gold/25 horn-clip touch-none select-none",
+          "relative cursor-crosshair overflow-hidden rounded-2xl border border-white/10 touch-none select-none",
           frenzy && phase === "playing" && "border-crimson/50 shadow-[0_0_24px_rgba(200,16,46,0.25)]"
         )}
         onPointerDown={(e) => {

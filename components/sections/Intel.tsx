@@ -445,12 +445,12 @@ function AirdropPredictor() {
 
 export function Intel() {
   return (
-    <section id="intel" className="relative scroll-mt-16 py-20 sm:py-28">
-      <div className="mx-auto max-w-7xl px-4 sm:px-6">
+    <section id="intel" className="section-shell section-glow">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <SectionHeader
-          kicker="Section 05 — Dashboard"
+          kicker="War room"
           title="Intel"
-          sub="The war room, running on real data: live whale movements and holder distribution from the Solana chain, and genuine 24h buy/sell pressure from DexScreener."
+          sub="Live whale movements, holder distribution from Solana, and 24h buy/sell pressure from DexScreener."
         />
         <div className="grid gap-6 md:grid-cols-2">
           <WhaleFeed />

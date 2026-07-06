@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Chakra_Petch, JetBrains_Mono, Unbounded } from "next/font/google";
+import { Bricolage_Grotesque, IBM_Plex_Mono, Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
 import "@solana/wallet-adapter-react-ui/styles.css";
 import { WalletProvider } from "@/components/WalletProvider";
@@ -9,24 +9,22 @@ import { EffectsLayer } from "@/components/EffectsLayer";
 import { slotUrl } from "@/lib/asset-manifest";
 import { CONTRACT_ADDRESS, SITE_NAME, SITE_URL, TAGLINE } from "@/lib/constants";
 
-const display = Unbounded({
+const display = Bricolage_Grotesque({
   subsets: ["latin"],
-  weight: ["400", "600", "700", "900"],
+  weight: ["400", "500", "600", "700", "800"],
   variable: "--font-display",
 });
-const body = Chakra_Petch({
+const body = Plus_Jakarta_Sans({
   subsets: ["latin"],
-  weight: ["300", "400", "500", "600", "700"],
+  weight: ["400", "500", "600", "700"],
   variable: "--font-body",
 });
-const mono = JetBrains_Mono({
+const mono = IBM_Plex_Mono({
   subsets: ["latin"],
-  weight: ["400", "700"],
+  weight: ["400", "500", "600"],
   variable: "--font-mono",
 });
 
-// Brand assets live at permanent Blob URLs — replaceable from /admin
-// without a redeploy (see lib/asset-manifest.ts).
 const OG_IMAGE = slotUrl("og-image");
 const FAVICON = slotUrl("favicon");
 
@@ -61,7 +59,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#0A0A0A",
+  themeColor: "#050506",
   width: "device-width",
   initialScale: 1,
 };

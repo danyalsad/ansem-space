@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { useHerd } from "@/components/HerdProvider";
 import { useMarket } from "@/components/MarketProvider";
 import { useWallet } from "@/components/WalletProvider";
-import { CREATOR_HANDLE, CREATOR_NAME, CREATOR_TAGLINE, LINKS } from "@/lib/constants";
+import { CREATOR_HANDLE, LINKS } from "@/lib/constants";
 import { BADGES } from "@/lib/points";
 import { triggerBullCharge } from "@/lib/confetti";
 import { cn, shortAddress } from "@/lib/utils";
@@ -23,39 +23,32 @@ const NAV_LINKS = [
   { href: "#intel", label: "Intel" },
 ];
 
-/** Live $ANSEM ticker fed by DexScreener (see MarketProvider). */
 function PriceTicker() {
   const { live, price, change24h } = useMarket();
   const up = change24h >= 0;
   return (
     <div
-      className="hidden items-center gap-2 font-mono text-xs md:flex"
-      title={live ? "Live price via DexScreener" : "Connecting to DexScreener…"}
+      className="hidden items-center gap-2 rounded-full border border-white/[0.06] bg-white/[0.03] px-3 py-1.5 font-mono text-xs md:flex"
+      title={live ? "Live via DexScreener" : "Connecting…"}
     >
-      <span className={cn("h-1.5 w-1.5 rounded-full", live ? "animate-pulseglow bg-gold" : "bg-ash/50")} />
-      <span className="text-ash">$ANSEM</span>
+      <span className={cn("h-1.5 w-1.5 rounded-full", live ? "animate-pulseglow bg-gold" : "bg-mist")} />
+      <span className="text-mist">$ANSEM</span>
       {live ? (
         <>
-          <motion.span
-            key={price}
-            initial={{ opacity: 0.4 }}
-            animate={{ opacity: 1 }}
-            className={cn("tabular-nums", up ? "text-gold" : "text-crimson-bright")}
-          >
+          <span className={cn("tabular-nums font-medium", up ? "text-gold" : "text-crimson-bright")}>
             ${price < 0.001 ? price.toFixed(7) : price.toFixed(4)}
-          </motion.span>
-          <span className={cn("tabular-nums", up ? "text-gold" : "text-crimson-bright")}>
-            {up ? "▲" : "▼"} {Math.abs(change24h).toFixed(2)}%
+          </span>
+          <span className={cn("tabular-nums text-mist", up ? "text-gold/80" : "text-crimson-bright/80")}>
+            {up ? "+" : ""}{change24h.toFixed(2)}%
           </span>
         </>
       ) : (
-        <span className="text-ash/60">loading…</span>
+        <span className="text-mist">…</span>
       )}
     </div>
   );
 }
 
-/** Wallet + Herd profile dropdown. */
 function ProfileMenu() {
   const { address, connecting, connect, disconnect } = useWallet();
   const { data, weeklyPoints, rank } = useHerd();
@@ -76,8 +69,7 @@ function ProfileMenu() {
     return (
       <Button size="sm" onClick={connect} disabled={connecting}>
         <Wallet size={14} />
-        <span className="hidden sm:inline">{connecting ? "Connecting…" : "Connect Wallet"}</span>
-        <span className="sm:hidden">{connecting ? "…" : "Connect"}</span>
+        <span className="hidden sm:inline">{connecting ? "Connecting…" : "Connect"}</span>
       </Button>
     );
   }
@@ -86,11 +78,11 @@ function ProfileMenu() {
     <div className="relative" ref={menuRef}>
       <button
         onClick={() => setOpen((o) => !o)}
-        className="flex items-center gap-2 border border-gold/40 px-3 py-2 font-mono text-xs text-gold transition-all hover:bg-gold/10 [clip-path:polygon(8px_0,100%_0,100%_calc(100%-8px),calc(100%-8px)_100%,0_100%,0_8px)]"
+        className="flex items-center gap-2 rounded-full border border-gold/30 bg-gold/[0.08] px-3.5 py-2 font-mono text-xs text-gold transition-all hover:bg-gold/15"
       >
         <Wallet size={13} />
         <span className="hidden sm:inline">{shortAddress(address)}</span>
-        <span className="border-l border-gold/30 pl-2 font-bold tabular-nums">
+        <span className="border-l border-gold/25 pl-2 font-semibold tabular-nums">
           {data.total.toLocaleString()} HP
         </span>
       </button>
@@ -102,7 +94,7 @@ function ProfileMenu() {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 8, scale: 0.97 }}
             transition={{ duration: 0.16 }}
-            className="absolute right-0 top-full mt-2 w-72 border border-gold/25 bg-panel p-4 shadow-panel"
+            className="absolute right-0 top-full mt-2 w-72 rounded-2xl border border-white/10 bg-panel p-4 shadow-panel-lift"
           >
             <button
               onClick={async () => {
@@ -119,22 +111,20 @@ function ProfileMenu() {
             </button>
 
             <div className="mt-3 grid grid-cols-3 gap-2 text-center">
-              <div className="border border-edge px-1 py-2.5">
-                <p className="font-display text-base text-gold">{data.total.toLocaleString()}</p>
-                <p className="mt-0.5 font-mono text-[9px] uppercase tracking-wider text-ash">Herd Pts</p>
-              </div>
-              <div className="border border-edge px-1 py-2.5">
-                <p className="font-display text-base text-bone">{weeklyPoints.toLocaleString()}</p>
-                <p className="mt-0.5 font-mono text-[9px] uppercase tracking-wider text-ash">This week</p>
-              </div>
-              <div className="border border-edge px-1 py-2.5">
-                <p className="font-display text-base text-crimson-bright">#{rank}</p>
-                <p className="mt-0.5 font-mono text-[9px] uppercase tracking-wider text-ash">Rank</p>
-              </div>
+              {[
+                { v: data.total.toLocaleString(), l: "Herd Pts", c: "text-gold" },
+                { v: weeklyPoints.toLocaleString(), l: "This week", c: "text-bone" },
+                { v: `#${rank}`, l: "Rank", c: "text-crimson-bright" },
+              ].map((s) => (
+                <div key={s.l} className="rounded-xl border border-white/[0.06] bg-surface/80 px-1 py-2.5">
+                  <p className={cn("font-display text-base font-semibold", s.c)}>{s.v}</p>
+                  <p className="mt-0.5 font-mono text-[9px] text-mist">{s.l}</p>
+                </div>
+              ))}
             </div>
 
             <div className="mt-3">
-              <p className="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-widest text-ash">
+              <p className="flex items-center gap-1.5 font-mono text-[10px] text-mist">
                 <Award size={11} /> Badges · {data.badges.length}/{BADGES.length}
               </p>
               <div className="mt-1.5 flex flex-wrap gap-1.5">
@@ -153,20 +143,17 @@ function ProfileMenu() {
               </div>
             </div>
 
-            <div className="mt-3 flex items-center justify-between border-t border-edge pt-3">
+            <div className="mt-3 flex items-center justify-between border-t border-white/[0.06] pt-3">
               <a
                 href="#herd"
                 onClick={() => setOpen(false)}
-                className="font-mono text-[10px] uppercase tracking-widest text-gold hover:text-gold-glow"
+                className="font-mono text-[10px] text-gold hover:text-gold-glow"
               >
-                View leaderboard →
+                Leaderboard →
               </a>
               <button
-                onClick={() => {
-                  disconnect();
-                  setOpen(false);
-                }}
-                className="flex items-center gap-1 font-mono text-[10px] uppercase tracking-widest text-ash hover:text-crimson-bright"
+                onClick={() => { disconnect(); setOpen(false); }}
+                className="flex items-center gap-1 font-mono text-[10px] text-mist hover:text-crimson-bright"
               >
                 <LogOut size={11} /> Disconnect
               </button>
@@ -180,10 +167,17 @@ function ProfileMenu() {
 
 export function Navbar() {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
   const clicks = useRef(0);
   const clickTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  /** Easter egg: 5 rapid clicks on the bull triggers the stampede. */
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 24);
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
   function onLogoClick() {
     clicks.current += 1;
     if (clickTimer.current) clearTimeout(clickTimer.current);
@@ -196,9 +190,15 @@ export function Navbar() {
   }
 
   return (
-    <header className="nav-glass fixed inset-x-0 top-0 z-50 border-b border-gold/20 edge-glow-top">
-      <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-3 px-4 sm:px-6">
-        {/* Logo + wordmark */}
+    <header className="fixed inset-x-0 top-0 z-50 px-4 pt-4 sm:px-6">
+      <div
+        className={cn(
+          "mx-auto flex h-14 max-w-7xl items-center justify-between gap-3 rounded-2xl border px-4 transition-all duration-300 sm:px-5",
+          scrolled
+            ? "nav-glass border-white/[0.08] shadow-float"
+            : "border-transparent bg-transparent"
+        )}
+      >
         <a
           href="#top"
           className="flex shrink-0 items-center gap-2.5"
@@ -208,90 +208,64 @@ export function Navbar() {
             document.getElementById("top")?.scrollIntoView({ behavior: "smooth" });
           }}
         >
-          <BullLogo glow className="h-10 w-10 transition-transform hover:scale-110" />
-          <span className="hidden font-display text-sm uppercase tracking-widest text-bone sm:inline">
+          <BullLogo glow className="h-9 w-9 transition-transform hover:scale-105" />
+          <span className="hidden font-display text-[15px] font-semibold text-bone sm:inline">
             ANSEM<span className="text-gold"> Space</span>
           </span>
         </a>
 
         <PriceTicker />
 
-        {/* Desktop nav */}
-        <nav className="hidden items-center gap-0.5 lg:flex">
+        <nav className="hidden items-center gap-1 lg:flex">
           {NAV_LINKS.map((l) => (
             <a
               key={l.href}
               href={l.href}
-              className="px-2.5 py-2 font-display text-[11px] uppercase tracking-[0.18em] text-ash transition-colors hover:text-gold"
+              className="rounded-lg px-3 py-2 text-sm font-medium text-ash transition-colors hover:bg-white/[0.04] hover:text-bone"
             >
               {l.label}
             </a>
           ))}
-          {/* Creator credit */}
           <a
             href={LINKS.creatorX}
             target="_blank"
             rel="noopener noreferrer"
-            title={`${CREATOR_NAME} — Chief Builder`}
-            className="ml-2 hidden items-center gap-1.5 border-l border-edge py-1 pl-3 font-mono text-[10px] text-ash/80 transition-colors hover:text-gold xl:flex"
+            className="ml-2 hidden rounded-lg border-l border-white/[0.06] pl-4 font-mono text-[10px] text-mist transition-colors hover:text-gold xl:inline"
           >
-            <span className="text-crimson">❤</span>
-            <span className="text-gold/90">{CREATOR_TAGLINE}</span>
-          </a>
-          <a
-            href="#builders"
-            className="hidden font-mono text-[9px] uppercase tracking-widest text-ash/60 transition-colors hover:text-gold lg:inline"
-          >
-            {CREATOR_NAME}
+            𝕏 {CREATOR_HANDLE}
           </a>
         </nav>
 
         <div className="flex items-center gap-2">
           <ProfileMenu />
-          {/* Mobile hamburger */}
           <button
-            className="p-2 text-bone lg:hidden"
+            className="rounded-lg p-2 text-bone lg:hidden"
             onClick={() => setMenuOpen((o) => !o)}
             aria-label="Toggle menu"
           >
-            {menuOpen ? <X size={22} /> : <Menu size={22} />}
+            {menuOpen ? <X size={20} /> : <Menu size={20} />}
           </button>
         </div>
       </div>
 
-      {/* Mobile menu */}
       <AnimatePresence>
         {menuOpen && (
           <motion.nav
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: "auto", opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            className="overflow-hidden border-t border-gold/10 bg-void/95 lg:hidden"
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            className="mx-auto mt-2 max-w-7xl overflow-hidden rounded-2xl border border-white/[0.08] bg-panel/95 p-4 shadow-panel-lift backdrop-blur-xl lg:hidden"
           >
-            <div className="flex flex-col px-6 py-4">
-              {NAV_LINKS.map((l, i) => (
-                <motion.a
-                  key={l.href}
-                  href={l.href}
-                  initial={{ opacity: 0, x: -16 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: i * 0.05 }}
-                  onClick={() => setMenuOpen(false)}
-                  className="border-b border-edge/50 py-3 font-display text-sm uppercase tracking-[0.2em] text-bone last:border-0 hover:text-gold"
-                >
-                  {l.label}
-                </motion.a>
-              ))}
+            {NAV_LINKS.map((l) => (
               <a
-                href={LINKS.creatorX}
-                target="_blank"
-                rel="noopener noreferrer"
+                key={l.href}
+                href={l.href}
                 onClick={() => setMenuOpen(false)}
-                className="pt-4 font-mono text-[11px] text-ash transition-colors hover:text-gold"
+                className="block rounded-xl px-3 py-3 text-sm font-medium text-bone hover:bg-white/[0.04]"
               >
-                {CREATOR_TAGLINE} · 𝕏 {CREATOR_HANDLE}
+                {l.label}
               </a>
-            </div>
+            ))}
           </motion.nav>
         )}
       </AnimatePresence>

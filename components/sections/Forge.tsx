@@ -616,12 +616,12 @@ export function Forge() {
     "w-full border border-edge bg-void px-3 py-2.5 font-body text-sm text-bone outline-none transition-colors placeholder:text-ash/50 focus:border-gold/60";
 
   return (
-    <section id="forge" className="relative scroll-mt-16 py-20 sm:py-28">
-      <div className="mx-auto max-w-7xl px-4 sm:px-6">
+    <section id="forge" className="section-shell section-glow">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <SectionHeader
-          kicker="Section 01 — Meme Lab"
+          kicker="Meme lab"
           title="The Forge"
-          sub="Weapons-grade meme production. Pick a Black Bull template, stamp your words on it, drop your own sticker, and unleash it on the timeline."
+          sub="Pick a Black Bull template, stamp your words, drop a sticker, and unleash it on the timeline."
         />
 
         {/* Weekly meme battle */}

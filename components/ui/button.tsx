@@ -2,24 +2,22 @@ import { forwardRef, type ButtonHTMLAttributes } from "react";
 import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
-/** shadcn-style button tuned for the cyber-bull system. */
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap font-display uppercase tracking-wider transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold/60 disabled:pointer-events-none disabled:opacity-50 active:scale-[0.97] select-none",
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap font-semibold transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold/50 focus-visible:ring-offset-2 focus-visible:ring-offset-void disabled:pointer-events-none disabled:opacity-50 active:scale-[0.98] select-none",
   {
     variants: {
       variant: {
-        gold: "bg-gold text-void hover:bg-gold-glow hover:shadow-gold-glow [clip-path:polygon(10px_0,100%_0,100%_calc(100%-10px),calc(100%-10px)_100%,0_100%,0_10px)]",
-        crimson:
-          "bg-crimson text-bone hover:brightness-110 hover:shadow-crimson-glow [clip-path:polygon(10px_0,100%_0,100%_calc(100%-10px),calc(100%-10px)_100%,0_100%,0_10px)]",
+        gold: "rounded-full bg-gold text-void hover:bg-gold-glow btn-glow",
+        crimson: "rounded-full bg-crimson text-bone hover:brightness-110 hover:shadow-crimson-glow",
         outline:
-          "border border-gold/40 text-gold hover:border-gold hover:bg-gold/10 [clip-path:polygon(10px_0,100%_0,100%_calc(100%-10px),calc(100%-10px)_100%,0_100%,0_10px)]",
-        ghost: "text-ash hover:text-gold hover:bg-gold/5",
+          "rounded-full border border-white/15 bg-white/[0.03] text-bone hover:border-gold/40 hover:bg-gold/10 hover:text-gold",
+        ghost: "rounded-lg text-ash hover:bg-white/[0.04] hover:text-bone",
       },
       size: {
-        sm: "h-8 px-3 text-[11px]",
-        md: "h-11 px-5 text-xs",
-        lg: "h-14 px-8 text-sm",
-        icon: "h-10 w-10",
+        sm: "h-9 px-4 text-xs",
+        md: "h-11 px-6 text-sm",
+        lg: "h-12 px-8 text-[15px]",
+        icon: "h-10 w-10 rounded-xl",
       },
     },
     defaultVariants: { variant: "gold", size: "md" },

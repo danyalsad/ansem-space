@@ -41,34 +41,30 @@ export function Charge() {
   const filtered = board.filter((e) => (e.game ?? "charge") === tab).slice(0, 8);
 
   return (
-    <section id="charge" className="relative scroll-mt-16 border-t border-edge/50 bg-abyss/40 py-20 sm:py-28">
-      <div className="mx-auto max-w-7xl px-4 sm:px-6">
+    <section id="charge" className="section-shell">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <SectionHeader
-          kicker="Section 02 — Arcade"
-          title="The Arcade"
-          sub="Three ways to earn Herd Points. Charge through obstacles, tap bulls on reflex, or hold the line like a true diamond hand. Every run counts toward quests."
-          index="02"
+          kicker="Arcade"
+          title="Play. Earn. Climb."
+          sub="Three mini-games, one HP pipeline. Charge through obstacles, tap bulls on reflex, or hold the line like a true diamond hand."
         />
 
-        {/* Game picker */}
         <div className="mb-8 grid gap-3 sm:grid-cols-3">
           {TABS.map((t) => (
             <button
               key={t.id}
               onClick={() => setTab(t.id)}
               className={cn(
-                "flex items-start gap-3 border p-4 text-left transition-all horn-clip-sm",
-                tab === t.id
-                  ? "border-gold/50 bg-gold/10 shadow-gold-glow"
-                  : "border-edge bg-panel hover:border-gold/30"
+                "surface-card-hover flex items-start gap-3 p-5 text-left",
+                tab === t.id && "border-gold/35 bg-gold/[0.06] shadow-gold-glow"
               )}
             >
-              <t.icon size={20} className={tab === t.id ? "text-gold" : "text-ash"} />
+              <t.icon size={20} className={tab === t.id ? "text-gold" : "text-mist"} />
               <span>
-                <span className="block font-display text-sm uppercase tracking-wide text-bone">{t.label}</span>
-                <span className="mt-0.5 block font-mono text-[10px] text-ash">{t.desc}</span>
-                <span className="mt-1 block font-mono text-[10px] text-gold">
-                  Best: {highs[t.id].toLocaleString()}
+                <span className="block font-display text-sm font-semibold text-bone">{t.label}</span>
+                <span className="mt-0.5 block text-xs text-mist">{t.desc}</span>
+                <span className="mt-1.5 block font-mono text-xs text-gold">
+                  Best {highs[t.id].toLocaleString()}
                 </span>
               </span>
             </button>
@@ -93,11 +89,11 @@ export function Charge() {
             )}
           </motion.div>
 
-          <aside className="border border-edge bg-panel p-5 shadow-panel horn-clip">
-            <h3 className="flex items-center gap-2 font-display text-sm uppercase tracking-widest text-gold">
-              <Trophy size={16} /> {GAME_LABELS[tab]} board
+          <aside className="surface-card p-5">
+            <h3 className="flex items-center gap-2 font-display text-sm font-semibold text-gold">
+              <Trophy size={16} /> {GAME_LABELS[tab]}
             </h3>
-            <p className="mt-1 font-mono text-[10px] text-ash">Top runs on this device</p>
+            <p className="mt-1 text-xs text-mist">Top runs on this device</p>
             {filtered.length === 0 ? (
               <p className="mt-6 text-center text-xs text-ash">
                 No scores yet — <span className="text-gold">claim the board.</span>
