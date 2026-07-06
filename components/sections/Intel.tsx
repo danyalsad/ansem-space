@@ -7,10 +7,11 @@
  * holder visualization, and the Next Airdrop Predictor with local voting.
  */
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Activity, Radar, Waves } from "lucide-react";
 import { SectionHeader } from "@/components/SectionHeader";
+import { useHerd } from "@/components/HerdProvider";
 import { useWallet } from "@/components/WalletProvider";
 import { LS } from "@/lib/constants";
 import { fireConfetti } from "@/lib/confetti";
@@ -48,15 +49,36 @@ function WhaleFeed() {
 
   useEffect(() => {
     let id = 0;
-    // Seed a few immediately so the panel never looks empty.
-    setTxs([makeTx(id++), makeTx(id++), makeTx(id++)]);
     let timer: ReturnType<typeof setTimeout>;
+    let cancelled = false;
+
+    // Seed from the API route (simulated today, Helius-ready — see
+    // app/api/whales/route.ts), then keep the feed ticking client-side.
+    fetch("/api/whales")
+      .then((r) => r.json())
+      .then((json: { txs: Array<Omit<WhaleTx, "id" | "ts">> }) => {
+        if (cancelled) return;
+        setTxs(
+          json.txs.slice(0, 4).map((t) => ({
+            ...t,
+            id: id++,
+            ts: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" }),
+          }))
+        );
+      })
+      .catch(() => {
+        if (!cancelled) setTxs([makeTx(id++), makeTx(id++), makeTx(id++)]);
+      });
+
     const tick = () => {
       setTxs((prev) => [makeTx(id++), ...prev].slice(0, 7));
       timer = setTimeout(tick, 1800 + Math.random() * 2600);
     };
     timer = setTimeout(tick, 2200);
-    return () => clearTimeout(timer);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
   }, []);
 
   return (
@@ -135,13 +157,13 @@ function SentimentGauge() {
         <svg viewBox="0 0 200 118" className="w-full">
           {/* Arc segments: cope → bull */}
           <path d="M 16 104 A 84 84 0 0 1 60 30" fill="none" stroke="#FF2E2E" strokeWidth="13" strokeLinecap="round" opacity="0.75" />
-          <path d="M 66 26 A 84 84 0 0 1 134 26" fill="none" stroke="#B8960B" strokeWidth="13" strokeLinecap="round" opacity="0.85" />
-          <path d="M 140 30 A 84 84 0 0 1 184 104" fill="none" stroke="#FFD700" strokeWidth="13" strokeLinecap="round" />
+          <path d="M 66 26 A 84 84 0 0 1 134 26" fill="none" stroke="#8C7326" strokeWidth="13" strokeLinecap="round" opacity="0.85" />
+          <path d="M 140 30 A 84 84 0 0 1 184 104" fill="none" stroke="#D4AF37" strokeWidth="13" strokeLinecap="round" />
           {/* Needle */}
           <g transform={`rotate(${angle} 100 104)`} style={{ transition: "transform 1.2s cubic-bezier(0.34,1.56,0.64,1)" }}>
             <line x1="100" y1="104" x2="100" y2="34" stroke="#EDE8DC" strokeWidth="3.5" strokeLinecap="round" />
           </g>
-          <circle cx="100" cy="104" r="7" fill="#FFD700" />
+          <circle cx="100" cy="104" r="7" fill="#D4AF37" />
         </svg>
         <p className="text-center font-display text-xl uppercase tracking-widest text-gold">{label}</p>
         <p className="text-center font-mono text-xs text-ash">{value.toFixed(0)} / 100 herd energy</p>
@@ -171,35 +193,67 @@ interface Bubble {
   isAnsem: boolean;
 }
 
-function buildBubbles(): Bubble[] {
+interface HolderDto {
+  label: string;
+  pct: number;
+  isAnsem: boolean;
+}
+
+/** Rejection-sample non-overlapping positions for the holder bubbles. */
+function layoutBubbles(holders: HolderDto[]): Bubble[] {
   const rand = seededRandom(42);
-  const bubbles: Bubble[] = [
-    { x: 50, y: 46, r: 15, label: "Ansem 🐂", pct: "6.9%", isAnsem: true },
-  ];
-  const names = ["LP Pool", "orca.sol", "herd_og", "moby", "grandma_sol", "bullmonk", "deepwater", "hoofdaddy"];
-  for (let i = 0; i < 22; i++) {
-    // Rejection-sample positions so bubbles roughly avoid each other.
-    let x = 0, y = 0, r = 0, ok = false, tries = 0;
-    while (!ok && tries < 40) {
-      r = 2.5 + rand() * 8;
+  const bubbles: Bubble[] = [];
+  for (const h of holders) {
+    const r = h.isAnsem ? 15 : Math.min(11, 2 + h.pct * 2.4);
+    if (h.isAnsem) {
+      bubbles.push({ x: 50, y: 46, r, label: h.label, pct: `${h.pct}%`, isAnsem: true });
+      continue;
+    }
+    let x = 0, y = 0, ok = false, tries = 0;
+    while (!ok && tries < 60) {
       x = 8 + rand() * 84;
       y = 10 + rand() * 78;
       ok = bubbles.every((b) => Math.hypot(b.x - x, b.y - y) > b.r + r + 1.5);
       tries++;
     }
-    bubbles.push({
-      x, y, r,
-      label: i < names.length ? names[i] : shortAddress(fakeSolAddress(rand)),
-      pct: `${(r / 6).toFixed(1)}%`,
-      isAnsem: false,
-    });
+    bubbles.push({ x, y, r, label: h.label, pct: `${h.pct}%`, isAnsem: false });
   }
   return bubbles;
 }
 
+/** Client fallback if the API route is unreachable. */
+function fallbackHolders(): HolderDto[] {
+  const rand = seededRandom(42);
+  return [
+    { label: "Ansem 🐂", pct: 6.9, isAnsem: true },
+    ...Array.from({ length: 20 }, () => ({
+      label: shortAddress(fakeSolAddress(rand)),
+      pct: Number((0.2 + rand() * 3.2).toFixed(2)),
+      isAnsem: false,
+    })),
+  ];
+}
+
 function BubbleMap() {
-  const bubbles = useMemo(buildBubbles, []);
+  const [bubbles, setBubbles] = useState<Bubble[]>([]);
   const [hovered, setHovered] = useState<Bubble | null>(null);
+
+  // Distribution comes from the API route (simulated today, Helius-ready —
+  // see app/api/holders/route.ts).
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/holders")
+      .then((r) => r.json())
+      .then((json: { holders: HolderDto[] }) => {
+        if (!cancelled) setBubbles(layoutBubbles(json.holders));
+      })
+      .catch(() => {
+        if (!cancelled) setBubbles(layoutBubbles(fallbackHolders()));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   return (
     <div className="border border-edge bg-panel p-5 shadow-panel [clip-path:polygon(12px_0,100%_0,100%_calc(100%-12px),calc(100%-12px)_100%,0_100%,0_12px)]">
@@ -223,8 +277,8 @@ function BubbleMap() {
             onMouseEnter={() => setHovered(b)}
             onMouseLeave={() => setHovered(null)}
             className="cursor-pointer"
-            fill={b.isAnsem ? "rgba(255,215,0,0.85)" : "rgba(237,232,220,0.14)"}
-            stroke={b.isAnsem ? "#FFD700" : hovered === b ? "#FFD700" : "rgba(255,215,0,0.25)"}
+            fill={b.isAnsem ? "rgba(212,175,55,0.85)" : "rgba(237,232,220,0.14)"}
+            stroke={b.isAnsem ? "#D4AF37" : hovered === b ? "#D4AF37" : "rgba(212,175,55,0.25)"}
             strokeWidth="0.5"
           />
         ))}
@@ -248,6 +302,7 @@ const PREDICTION_OPTIONS = [
 
 function AirdropPredictor() {
   const { address } = useWallet();
+  const { earn } = useHerd();
   const [choice, setChoice] = useState<string | null>(null);
 
   useEffect(() => {
@@ -258,6 +313,7 @@ function AirdropPredictor() {
     if (choice) return;
     setChoice(id);
     store.set(LS.prediction, id);
+    earn("intel"); // +20 HP — unlocks the Oracle badge
     fireConfetti({ count: 60 });
   }
 

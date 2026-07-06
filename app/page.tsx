@@ -2,6 +2,7 @@ import { Navbar } from "@/components/Navbar";
 import { Hero } from "@/components/Hero";
 import { Forge } from "@/components/sections/Forge";
 import { Charge } from "@/components/sections/Charge";
+import { Herd } from "@/components/sections/Herd";
 import { Hands } from "@/components/sections/Hands";
 import { Lore } from "@/components/sections/Lore";
 import { Intel } from "@/components/sections/Intel";
@@ -15,6 +16,7 @@ export default function Home() {
       <Hero />
       <Forge />
       <Charge />
+      <Herd />
       <Hands />
       <Lore />
       <Intel />

@@ -13,8 +13,10 @@ import { Pause, Play, RotateCcw, Share2, Trophy } from "lucide-react";
 import { SectionHeader } from "@/components/SectionHeader";
 import { Button } from "@/components/ui/button";
 import { useWallet } from "@/components/WalletProvider";
+import { useHerd } from "@/components/HerdProvider";
 import { drawBull } from "@/lib/bull";
 import { LS, shareOnX } from "@/lib/constants";
+import { BONE, CRIMSON_BRIGHT, GOLD, GOLD_BRIGHT, VOID } from "@/lib/palette";
 import { fireConfetti } from "@/lib/confetti";
 import { cn, shortAddress, store } from "@/lib/utils";
 
@@ -31,7 +33,16 @@ interface Entity {
   collected?: boolean;
 }
 
+/** Floating "+100" style feedback text. */
+interface Popup {
+  x: number;
+  y: number;
+  text: string;
+  life: number; // 1 → 0
+}
+
 interface GameState {
+  popups: Popup[];
   phase: Phase;
   bullY: number;
   bullVy: number;
@@ -82,6 +93,7 @@ function getDailyChallenge(): { id: string; label: string; check: (s: { coins: n
 export function Charge() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const game = useRef<GameState>({
+    popups: [],
     phase: "idle",
     bullY: GROUND - BULL_SIZE,
     bullVy: 0,
@@ -97,9 +109,11 @@ export function Charge() {
   });
 
   const { address, connect } = useWallet();
+  const { earn } = useHerd();
   const [phase, setPhase] = useState<Phase>("idle");
   const [score, setScore] = useState(0);
   const [coins, setCoins] = useState(0);
+  const [hpEarned, setHpEarned] = useState(0);
   const [highScore, setHighScore] = useState(0);
   const [submitted, setSubmitted] = useState(false);
   const [playerScores, setPlayerScores] = useState<Array<{ name: string; score: number }>>([]);
@@ -117,13 +131,13 @@ export function Charge() {
   const draw = useCallback((g: GameState, ctx: CanvasRenderingContext2D) => {
     // Sky
     const sky = ctx.createLinearGradient(0, 0, 0, H);
-    sky.addColorStop(0, "#0A0A0A");
+    sky.addColorStop(0, VOID);
     sky.addColorStop(1, "#16121C");
     ctx.fillStyle = sky;
     ctx.fillRect(0, 0, W, H);
 
     // Parallax grid floor lines
-    ctx.strokeStyle = "rgba(255,215,0,0.08)";
+    ctx.strokeStyle = "rgba(212,175,55,0.08)";
     ctx.lineWidth = 1;
     const offset = (g.distance * 0.6) % 48;
     for (let x = -offset; x < W; x += 48) {
@@ -134,9 +148,9 @@ export function Charge() {
     }
 
     // Ground
-    ctx.fillStyle = "#FFD700";
+    ctx.fillStyle = GOLD;
     ctx.fillRect(0, GROUND, W, 2.5);
-    ctx.fillStyle = "rgba(255,215,0,0.06)";
+    ctx.fillStyle = "rgba(212,175,55,0.06)";
     ctx.fillRect(0, GROUND, W, H - GROUND);
 
     // Entities
@@ -148,14 +162,14 @@ export function Charge() {
       const cy = e.y + e.h / 2;
       if (e.kind === "coin") {
         ctx.save();
-        ctx.shadowColor = "#FFD700";
+        ctx.shadowColor = GOLD;
         ctx.shadowBlur = 12;
-        ctx.fillStyle = "#FFD700";
+        ctx.fillStyle = GOLD;
         ctx.beginPath();
         ctx.arc(cx, cy, e.w / 2, 0, Math.PI * 2);
         ctx.fill();
         ctx.shadowBlur = 0;
-        ctx.fillStyle = "#0A0A0A";
+        ctx.fillStyle = VOID;
         ctx.font = "900 15px Impact, sans-serif";
         ctx.fillText("A", cx, cy + 1);
         ctx.restore();
@@ -171,7 +185,7 @@ export function Charge() {
       } else {
         ctx.font = `${e.h}px sans-serif`;
         ctx.fillText("🐻", cx, cy);
-        ctx.strokeStyle = "#FF2E2E";
+        ctx.strokeStyle = CRIMSON_BRIGHT;
         ctx.lineWidth = 2;
         ctx.strokeRect(e.x, e.y + e.h - 6, e.w, 6);
       }
@@ -184,12 +198,23 @@ export function Charge() {
     ctx.restore();
     drawBull(ctx, BULL_X, g.bullY, BULL_SIZE, "gold");
 
+    // Floating reward popups
+    ctx.textAlign = "center";
+    for (const p of g.popups) {
+      ctx.save();
+      ctx.globalAlpha = Math.max(0, p.life);
+      ctx.fillStyle = GOLD_BRIGHT;
+      ctx.font = "900 18px Impact, sans-serif";
+      ctx.fillText(p.text, p.x, p.y - (1 - p.life) * 40);
+      ctx.restore();
+    }
+
     // HUD
     ctx.textAlign = "left";
-    ctx.fillStyle = "#EDE8DC";
+    ctx.fillStyle = BONE;
     ctx.font = "700 16px monospace";
     ctx.fillText(`SCORE ${Math.floor(g.distance + g.coins * 100)}`, 16, 26);
-    ctx.fillStyle = "#FFD700";
+    ctx.fillStyle = GOLD;
     ctx.fillText(`◉ ${g.coins}`, 16, 48);
   }, []);
 
@@ -202,6 +227,10 @@ export function Charge() {
       setScore(finalScore);
       setCoins(g.coins);
       setSubmitted(false);
+
+      // Herd Points: score ÷ 50, clamped — every run feeds your rank.
+      const { gained } = earn("game", { score: finalScore });
+      setHpEarned(gained);
 
       const prevHigh = store.get<number>(LS.highScore, 0);
       if (finalScore > prevHigh) {
@@ -221,7 +250,7 @@ export function Charge() {
         }
       }
     },
-    []
+    [earn]
   );
 
   const loop = useCallback(
@@ -280,9 +309,11 @@ export function Charge() {
         if (e.kind === "coin") {
           e.collected = true;
           g.coins += 1;
+          g.popups.push({ x: e.x + e.w / 2, y: e.y, text: "+100", life: 1 });
         } else if (e.kind === "solbag") {
           e.collected = true;
           g.coins += 5;
+          g.popups.push({ x: e.x + e.w / 2, y: e.y, text: "+500 SOL BAG!", life: 1 });
         } else {
           draw(g, ctx);
           endRun(g);
@@ -290,6 +321,10 @@ export function Charge() {
         }
       }
       g.entities = g.entities.filter((e) => e.x > -80 && !e.collected);
+
+      // Fade out reward popups
+      for (const p of g.popups) p.life -= dt * 1.3;
+      g.popups = g.popups.filter((p) => p.life > 0);
 
       draw(g, ctx);
       g.raf = requestAnimationFrame(loop);
@@ -302,6 +337,7 @@ export function Charge() {
     cancelAnimationFrame(g.raf);
     Object.assign(g, {
       phase: "running",
+      popups: [],
       bullY: GROUND - BULL_SIZE,
       bullVy: 0,
       jumpsLeft: 2,
@@ -438,6 +474,16 @@ export function Charge() {
                   <p className="font-mono text-xs text-ash">
                     {coins} coins · best {Math.max(highScore, score).toLocaleString()}
                   </p>
+                  {hpEarned > 0 && (
+                    <motion.p
+                      initial={{ scale: 0.6, opacity: 0 }}
+                      animate={{ scale: 1, opacity: 1 }}
+                      transition={{ type: "spring", stiffness: 300, damping: 18, delay: 0.2 }}
+                      className="border border-gold/50 bg-gold/10 px-3 py-1.5 font-display text-sm uppercase tracking-wider text-gold"
+                    >
+                      +{hpEarned} Herd Points earned
+                    </motion.p>
+                  )}
                   <div className="mt-2 flex flex-wrap justify-center gap-2">
                     <Button size="sm" onClick={start}>
                       <RotateCcw size={14} /> Run it back

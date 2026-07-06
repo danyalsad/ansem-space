@@ -12,6 +12,7 @@ import { BadgeCheck, BookOpen, Heart, MessageCircle, Repeat2, Square } from "luc
 import { SectionHeader } from "@/components/SectionHeader";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
+import { useHerd } from "@/components/HerdProvider";
 import { cn } from "@/lib/utils";
 
 interface FakeTweet {
@@ -150,17 +151,19 @@ function FakeTweetCard({ tweet }: { tweet: FakeTweet }) {
 }
 
 export function Lore() {
+  const { earn } = useHerd();
   const [openEvent, setOpenEvent] = useState<LoreEvent | null>(null);
   const [storyMode, setStoryMode] = useState(false);
   const [storyIndex, setStoryIndex] = useState(-1);
   const itemRefs = useRef<Array<HTMLDivElement | null>>([]);
 
-  // Story Mode: auto-scroll chapter to chapter.
+  // Story Mode: auto-scroll chapter to chapter; finishing the saga pays HP.
   useEffect(() => {
     if (!storyMode) return;
     if (storyIndex >= LORE_EVENTS.length) {
       setStoryMode(false);
       setStoryIndex(-1);
+      earn("story"); // +100 HP first completion — Lore Keeper badge
       return;
     }
     if (storyIndex >= 0) {
@@ -168,7 +171,7 @@ export function Lore() {
     }
     const t = setTimeout(() => setStoryIndex((i) => i + 1), storyIndex < 0 ? 200 : 3600);
     return () => clearTimeout(t);
-  }, [storyMode, storyIndex]);
+  }, [storyMode, storyIndex, earn]);
 
   return (
     <section id="lore" className="relative scroll-mt-16 border-t border-edge/50 bg-abyss/40 py-20 sm:py-28">

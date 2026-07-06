@@ -4,7 +4,7 @@
  * as a window event and rendered by <EffectsLayer />.
  */
 
-const COLORS = ["#FFD700", "#FFE873", "#FF2E2E", "#EDE8DC", "#B8960B"];
+const COLORS = ["#D4AF37", "#EDCB6A", "#C8102E", "#F2EFE9", "#8C7326"];
 
 interface Particle {
   x: number;

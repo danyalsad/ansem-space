@@ -2,60 +2,175 @@
 
 import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Menu, Wallet, X } from "lucide-react";
+import { Award, Check, Copy, LogOut, Menu, Wallet, X } from "lucide-react";
 import { BullLogo } from "@/components/BullLogo";
 import { Button } from "@/components/ui/button";
+import { useHerd } from "@/components/HerdProvider";
+import { useMarket } from "@/components/MarketProvider";
 import { useWallet } from "@/components/WalletProvider";
+import { BADGES } from "@/lib/points";
 import { triggerBullCharge } from "@/lib/confetti";
-import { cn, shortAddress } from "@/lib/utils";
+import { cn, formatUsd, shortAddress } from "@/lib/utils";
 
 const NAV_LINKS = [
   { href: "#forge", label: "Forge" },
   { href: "#charge", label: "Charge" },
+  { href: "#herd", label: "Herd" },
   { href: "#hands", label: "Hands" },
   { href: "#lore", label: "Lore" },
   { href: "#intel", label: "Intel" },
 ];
 
-/** Simulated live price ticker — random walk, re-rolls every 3 seconds. */
+/** Live $ANSEM ticker fed by DexScreener (see MarketProvider). */
 function PriceTicker() {
-  const [price, setPrice] = useState(0.004269);
-  const [delta, setDelta] = useState(0.042);
-
-  useEffect(() => {
-    const id = setInterval(() => {
-      setPrice((p) => {
-        // Slight bullish drift, obviously.
-        const move = p * (Math.random() * 0.03 - 0.013);
-        const next = Math.max(0.0001, p + move);
-        setDelta(move / p);
-        return next;
-      });
-    }, 3000);
-    return () => clearInterval(id);
-  }, []);
-
-  const up = delta >= 0;
+  const { live, price, change24h } = useMarket();
+  const up = change24h >= 0;
   return (
-    <div className="hidden items-center gap-2 font-mono text-xs md:flex" title="Simulated price">
+    <div
+      className="hidden items-center gap-2 font-mono text-xs md:flex"
+      title={live ? "Live price via DexScreener" : "Connecting to DexScreener…"}
+    >
+      <span className={cn("h-1.5 w-1.5 rounded-full", live ? "animate-pulseglow bg-gold" : "bg-ash/50")} />
       <span className="text-ash">$ANSEM</span>
       <motion.span
         key={price}
-        initial={{ opacity: 0.4, y: up ? 6 : -6 }}
-        animate={{ opacity: 1, y: 0 }}
-        className={cn("tabular-nums", up ? "text-gold" : "text-crimson")}
+        initial={{ opacity: 0.4 }}
+        animate={{ opacity: 1 }}
+        className={cn("tabular-nums", up ? "text-gold" : "text-crimson-bright")}
       >
-        ${price.toFixed(6)}
+        ${price < 0.001 ? price.toFixed(7) : price.toFixed(6)}
       </motion.span>
-      <span className={cn("tabular-nums", up ? "text-gold" : "text-crimson")}>
-        {up ? "▲" : "▼"} {Math.abs(delta * 100).toFixed(2)}%
+      <span className={cn("tabular-nums", up ? "text-gold" : "text-crimson-bright")}>
+        {up ? "▲" : "▼"} {Math.abs(change24h).toFixed(2)}%
       </span>
     </div>
   );
 }
 
-export function Navbar() {
+/** Wallet + Herd profile dropdown. */
+function ProfileMenu() {
   const { address, connecting, connect, disconnect } = useWallet();
+  const { data, weeklyPoints, rank } = useHerd();
+  const [open, setOpen] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onClick = (e: MouseEvent) => {
+      if (!menuRef.current?.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", onClick);
+    return () => document.removeEventListener("mousedown", onClick);
+  }, [open]);
+
+  if (!address) {
+    return (
+      <Button size="sm" onClick={connect} disabled={connecting}>
+        <Wallet size={14} />
+        <span className="hidden sm:inline">{connecting ? "Connecting…" : "Connect Wallet"}</span>
+        <span className="sm:hidden">{connecting ? "…" : "Connect"}</span>
+      </Button>
+    );
+  }
+
+  return (
+    <div className="relative" ref={menuRef}>
+      <button
+        onClick={() => setOpen((o) => !o)}
+        className="flex items-center gap-2 border border-gold/40 px-3 py-2 font-mono text-xs text-gold transition-all hover:bg-gold/10 [clip-path:polygon(8px_0,100%_0,100%_calc(100%-8px),calc(100%-8px)_100%,0_100%,0_8px)]"
+      >
+        <Wallet size={13} />
+        <span className="hidden sm:inline">{shortAddress(address)}</span>
+        <span className="border-l border-gold/30 pl-2 font-bold tabular-nums">
+          {data.total.toLocaleString()} HP
+        </span>
+      </button>
+
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            initial={{ opacity: 0, y: 8, scale: 0.97 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 8, scale: 0.97 }}
+            transition={{ duration: 0.16 }}
+            className="absolute right-0 top-full mt-2 w-72 border border-gold/25 bg-panel p-4 shadow-panel"
+          >
+            <button
+              onClick={async () => {
+                try {
+                  await navigator.clipboard.writeText(address);
+                  setCopied(true);
+                  setTimeout(() => setCopied(false), 1500);
+                } catch { /* ignore */ }
+              }}
+              className="flex w-full items-center justify-between gap-2 font-mono text-[11px] text-ash hover:text-bone"
+            >
+              <span className="truncate">{shortAddress(address, 8)}</span>
+              {copied ? <Check size={12} className="text-gold" /> : <Copy size={12} />}
+            </button>
+
+            <div className="mt-3 grid grid-cols-3 gap-2 text-center">
+              <div className="border border-edge px-1 py-2.5">
+                <p className="font-display text-base text-gold">{data.total.toLocaleString()}</p>
+                <p className="mt-0.5 font-mono text-[9px] uppercase tracking-wider text-ash">Herd Pts</p>
+              </div>
+              <div className="border border-edge px-1 py-2.5">
+                <p className="font-display text-base text-bone">{weeklyPoints.toLocaleString()}</p>
+                <p className="mt-0.5 font-mono text-[9px] uppercase tracking-wider text-ash">This week</p>
+              </div>
+              <div className="border border-edge px-1 py-2.5">
+                <p className="font-display text-base text-crimson-bright">#{rank}</p>
+                <p className="mt-0.5 font-mono text-[9px] uppercase tracking-wider text-ash">Rank</p>
+              </div>
+            </div>
+
+            <div className="mt-3">
+              <p className="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-widest text-ash">
+                <Award size={11} /> Badges · {data.badges.length}/{BADGES.length}
+              </p>
+              <div className="mt-1.5 flex flex-wrap gap-1.5">
+                {BADGES.map((b) => (
+                  <span
+                    key={b.id}
+                    title={`${b.name} — ${b.desc}`}
+                    className={cn(
+                      "text-lg transition-opacity",
+                      data.badges.includes(b.id) ? "opacity-100" : "opacity-20 grayscale"
+                    )}
+                  >
+                    {b.emoji}
+                  </span>
+                ))}
+              </div>
+            </div>
+
+            <div className="mt-3 flex items-center justify-between border-t border-edge pt-3">
+              <a
+                href="#herd"
+                onClick={() => setOpen(false)}
+                className="font-mono text-[10px] uppercase tracking-widest text-gold hover:text-gold-glow"
+              >
+                View leaderboard →
+              </a>
+              <button
+                onClick={() => {
+                  disconnect();
+                  setOpen(false);
+                }}
+                className="flex items-center gap-1 font-mono text-[10px] uppercase tracking-widest text-ash hover:text-crimson-bright"
+              >
+                <LogOut size={11} /> Disconnect
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+export function Navbar() {
   const [menuOpen, setMenuOpen] = useState(false);
   const clicks = useRef(0);
   const clickTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -74,11 +189,11 @@ export function Navbar() {
 
   return (
     <header className="fixed inset-x-0 top-0 z-50 border-b border-gold/15 bg-void/85 backdrop-blur-md">
-      <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-4 px-4 sm:px-6">
+      <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-3 px-4 sm:px-6">
         {/* Logo + wordmark */}
         <a
           href="#top"
-          className="flex items-center gap-2.5"
+          className="flex shrink-0 items-center gap-2.5"
           onClick={(e) => {
             e.preventDefault();
             onLogoClick();
@@ -86,7 +201,7 @@ export function Navbar() {
           }}
         >
           <BullLogo glow className="h-10 w-10 transition-transform hover:scale-110" />
-          <span className="font-display text-sm uppercase tracking-widest text-bone">
+          <span className="hidden font-display text-sm uppercase tracking-widest text-bone sm:inline">
             ANSEM<span className="text-gold"> Space</span>
           </span>
         </a>
@@ -94,12 +209,12 @@ export function Navbar() {
         <PriceTicker />
 
         {/* Desktop nav */}
-        <nav className="hidden items-center gap-1 lg:flex">
+        <nav className="hidden items-center gap-0.5 lg:flex">
           {NAV_LINKS.map((l) => (
             <a
               key={l.href}
               href={l.href}
-              className="px-3 py-2 font-display text-[11px] uppercase tracking-[0.2em] text-ash transition-colors hover:text-gold"
+              className="px-2.5 py-2 font-display text-[11px] uppercase tracking-[0.18em] text-ash transition-colors hover:text-gold"
             >
               {l.label}
             </a>
@@ -107,17 +222,7 @@ export function Navbar() {
         </nav>
 
         <div className="flex items-center gap-2">
-          {address ? (
-            <Button variant="outline" size="sm" onClick={disconnect} title="Click to disconnect">
-              <Wallet size={14} />
-              {shortAddress(address)}
-            </Button>
-          ) : (
-            <Button size="sm" onClick={connect} disabled={connecting}>
-              <Wallet size={14} />
-              {connecting ? "Connecting…" : "Connect Wallet"}
-            </Button>
-          )}
+          <ProfileMenu />
           {/* Mobile hamburger */}
           <button
             className="p-2 text-bone lg:hidden"

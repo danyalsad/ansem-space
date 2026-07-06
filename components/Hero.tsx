@@ -31,9 +31,9 @@ export function Hero() {
     <section id="top" className="relative flex min-h-[100svh] items-center overflow-hidden pt-16">
       {/* Atmosphere: radial gold core, crimson under-glow, cyber grid, scanline */}
       <div className="pointer-events-none absolute inset-0">
-        <div className="absolute left-1/2 top-1/3 h-[60vmax] w-[60vmax] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[radial-gradient(circle,rgba(255,215,0,0.08)_0%,transparent_60%)]" />
-        <div className="absolute bottom-0 left-1/2 h-[40vmax] w-[80vmax] -translate-x-1/2 translate-y-1/2 rounded-full bg-[radial-gradient(circle,rgba(255,46,46,0.07)_0%,transparent_60%)]" />
-        <div className="absolute inset-0 bg-[linear-gradient(rgba(255,215,0,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(255,215,0,0.03)_1px,transparent_1px)] bg-[size:56px_56px] [mask-image:radial-gradient(ellipse_at_center,black_30%,transparent_75%)]" />
+        <div className="absolute left-1/2 top-1/3 h-[60vmax] w-[60vmax] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[radial-gradient(circle,rgba(212,175,55,0.08)_0%,transparent_60%)]" />
+        <div className="absolute bottom-0 left-1/2 h-[40vmax] w-[80vmax] -translate-x-1/2 translate-y-1/2 rounded-full bg-[radial-gradient(circle,rgba(200,16,46,0.07)_0%,transparent_60%)]" />
+        <div className="absolute inset-0 bg-[linear-gradient(rgba(212,175,55,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(212,175,55,0.03)_1px,transparent_1px)] bg-[size:56px_56px] [mask-image:radial-gradient(ellipse_at_center,black_30%,transparent_75%)]" />
         <div className="absolute inset-x-0 h-24 animate-scanline bg-gradient-to-b from-transparent via-gold/[0.04] to-transparent" />
       </div>
 
@@ -52,7 +52,7 @@ export function Hero() {
           >
             Welcome to
             <br />
-            <span className="text-gold [text-shadow:0_0_40px_rgba(255,215,0,0.35)]">
+            <span className="text-gold [text-shadow:0_0_40px_rgba(212,175,55,0.35)]">
               ANSEM Space
             </span>
           </motion.h1>
@@ -104,9 +104,9 @@ export function Hero() {
           transition={{ duration: 1, delay: 0.4, ease: [0.22, 1, 0.36, 1] }}
           className="relative mx-auto hidden lg:block"
         >
-          <div className="absolute inset-0 scale-90 rounded-full bg-[radial-gradient(circle,rgba(255,215,0,0.14)_0%,transparent_65%)] blur-xl" />
+          <div className="absolute inset-0 scale-90 rounded-full bg-[radial-gradient(circle,rgba(212,175,55,0.14)_0%,transparent_65%)] blur-xl" />
           <div className="animate-floaty">
-            <BullLogo className="h-[26rem] w-[26rem] drop-shadow-[0_0_60px_rgba(255,215,0,0.3)]" />
+            <BullLogo className="h-[26rem] w-[26rem] drop-shadow-[0_0_60px_rgba(212,175,55,0.3)]" />
           </div>
           {/* Orbiting accent ring */}
           <motion.div

@@ -20,16 +20,17 @@ const config: Config = {
         panel: "#141317",
         edge: "#26232B",
         gold: {
-          DEFAULT: "#FFD700",
-          dim: "#B8960B",
-          glow: "#FFE873",
+          DEFAULT: "#D4AF37",
+          dim: "#8C7326",
+          glow: "#EDCB6A",
         },
         crimson: {
-          DEFAULT: "#FF2E2E",
-          dim: "#8F1414",
+          DEFAULT: "#C8102E",
+          bright: "#FF2E2E",
+          dim: "#6E0A19",
         },
-        bone: "#EDE8DC",
-        ash: "#8B8694",
+        bone: "#F2EFE9",
+        ash: "#9A95A3",
       },
       fontFamily: {
         display: ["var(--font-display)", "sans-serif"],
@@ -37,8 +38,8 @@ const config: Config = {
         mono: ["var(--font-mono)", "monospace"],
       },
       boxShadow: {
-        "gold-glow": "0 0 24px rgba(255,215,0,0.25), 0 0 64px rgba(255,215,0,0.08)",
-        "crimson-glow": "0 0 24px rgba(255,46,46,0.3)",
+        "gold-glow": "0 0 24px rgba(212,175,55,0.25), 0 0 64px rgba(212,175,55,0.08)",
+        "crimson-glow": "0 0 24px rgba(200,16,46,0.35)",
         panel: "0 1px 0 rgba(255,255,255,0.04) inset, 0 12px 40px rgba(0,0,0,0.6)",
       },
       keyframes: {

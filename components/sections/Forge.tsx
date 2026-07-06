@@ -21,6 +21,8 @@ import {
 } from "lucide-react";
 import { SectionHeader } from "@/components/SectionHeader";
 import { Button } from "@/components/ui/button";
+import { useHerd } from "@/components/HerdProvider";
+import { fileToDataUrl, listAssets, saveAsset, type SiteAsset } from "@/lib/assets";
 import { drawBull } from "@/lib/bull";
 import { LS, shareOnX } from "@/lib/constants";
 import { fireConfetti } from "@/lib/confetti";
@@ -60,11 +62,11 @@ const TEMPLATES: Template[] = [
       ctx.fillStyle = "#0A0A0A";
       ctx.fillRect(0, 0, w, h);
       const g = ctx.createRadialGradient(w / 2, h / 2, 60, w / 2, h / 2, w * 0.7);
-      g.addColorStop(0, "rgba(255,215,0,0.28)");
-      g.addColorStop(1, "rgba(255,215,0,0)");
+      g.addColorStop(0, "rgba(212,175,55,0.28)");
+      g.addColorStop(1, "rgba(212,175,55,0)");
       ctx.fillStyle = g;
       ctx.fillRect(0, 0, w, h);
-      speedLines(ctx, w, h, "#FFD700");
+      speedLines(ctx, w, h, "#D4AF37");
       drawBull(ctx, w * 0.2, h * 0.2, w * 0.6, "gold");
     },
   },
@@ -98,8 +100,8 @@ const TEMPLATES: Template[] = [
         ctx.fillRect(cx, top, w * 0.07, Math.max(12, bot - top));
       }
       const g = ctx.createRadialGradient(w * 0.83, h * 0.16, 20, w * 0.83, h * 0.16, 400);
-      g.addColorStop(0, "rgba(255,215,0,0.35)");
-      g.addColorStop(1, "rgba(255,215,0,0)");
+      g.addColorStop(0, "rgba(212,175,55,0.35)");
+      g.addColorStop(1, "rgba(212,175,55,0)");
       ctx.fillStyle = g;
       ctx.fillRect(0, 0, w, h);
       // Bull surfing the god candle
@@ -158,13 +160,13 @@ const TEMPLATES: Template[] = [
       ctx.save();
       ctx.rotate(-0.3);
       for (let i = -6; i < 20; i++) {
-        ctx.fillStyle = i % 2 ? "rgba(255,46,46,0.08)" : "transparent";
+        ctx.fillStyle = i % 2 ? "rgba(200,16,46,0.08)" : "transparent";
         ctx.fillRect(i * 120, -h, 120, h * 3);
       }
       ctx.restore();
       // Scattered REKT text
       ctx.font = `700 44px Impact, sans-serif`;
-      ctx.fillStyle = "rgba(255,46,46,0.25)";
+      ctx.fillStyle = "rgba(200,16,46,0.25)";
       const words = ["REKT", "NGMI", "SOLD?", "PAPER"];
       for (let i = 0; i < 10; i++) {
         ctx.save();
@@ -183,12 +185,12 @@ const TEMPLATES: Template[] = [
       ctx.fillStyle = "#0A0A0A";
       ctx.fillRect(0, 0, w, h);
       const g = ctx.createRadialGradient(w / 2, h / 2, 60, w / 2, h / 2, w * 0.75);
-      g.addColorStop(0, "rgba(255,215,0,0.07)");
-      g.addColorStop(1, "rgba(255,215,0,0)");
+      g.addColorStop(0, "rgba(212,175,55,0.07)");
+      g.addColorStop(1, "rgba(212,175,55,0)");
       ctx.fillStyle = g;
       ctx.fillRect(0, 0, w, h);
       drawBull(ctx, w * 0.3, h * 0.3, w * 0.4, "silhouette");
-      ctx.strokeStyle = "rgba(255,215,0,0.35)";
+      ctx.strokeStyle = "rgba(212,175,55,0.35)";
       ctx.lineWidth = 10;
       ctx.strokeRect(20, 20, w - 40, h - 40);
     },
@@ -240,6 +242,12 @@ type SortMode = "top" | "new";
 export function Forge() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const stickerRef = useRef<HTMLImageElement | null>(null);
+  const { earn } = useHerd();
+
+  // Custom image templates (user uploads + admin assets, see lib/assets.ts)
+  const [customTemplates, setCustomTemplates] = useState<SiteAsset[]>([]);
+  const templateImgCache = useRef<Map<string, HTMLImageElement>>(new Map());
+  const [imgTick, setImgTick] = useState(0); // re-render when a template image finishes loading
 
   const [template, setTemplate] = useState(TEMPLATES[0]);
   const [topText, setTopText] = useState("WHEN ANSEM AIRDROPS");
@@ -256,6 +264,41 @@ export function Forge() {
   const [voted, setVoted] = useState<string[]>([]);
   const [sort, setSort] = useState<SortMode>("top");
   const [uploadCaption, setUploadCaption] = useState("");
+
+  /* ---------------- custom templates ---------------- */
+
+  /** Wrap an uploaded asset as a canvas template (cover-fit background). */
+  const assetToTemplate = useCallback((asset: SiteAsset): Template => {
+    return {
+      id: asset.id,
+      name: asset.name,
+      draw: (ctx, w, h) => {
+        ctx.fillStyle = "#0A0A0A";
+        ctx.fillRect(0, 0, w, h);
+        let img = templateImgCache.current.get(asset.id);
+        if (!img) {
+          img = new Image();
+          img.onload = () => setImgTick((t) => t + 1);
+          img.src = asset.dataUrl;
+          templateImgCache.current.set(asset.id, img);
+        }
+        if (img.complete && img.width > 0) {
+          const scale = Math.max(w / img.width, h / img.height);
+          const dw = img.width * scale;
+          const dh = img.height * scale;
+          ctx.drawImage(img, (w - dw) / 2, (h - dh) / 2, dw, dh);
+        }
+      },
+    };
+  }, []);
+
+  useEffect(() => {
+    listAssets().then((all) =>
+      setCustomTemplates(all.filter((a) => a.category === "template" || a.category === "background"))
+    );
+  }, []);
+
+  const allTemplates: Template[] = [...TEMPLATES, ...customTemplates.map(assetToTemplate)];
 
   /* ---------------- canvas render ---------------- */
 
@@ -298,7 +341,7 @@ export function Forge() {
       ctx.textAlign = "center";
       ctx.textBaseline = baseline;
       if (glow) {
-        ctx.shadowColor = "#FFD700";
+        ctx.shadowColor = "#D4AF37";
         ctx.shadowBlur = 34;
       }
       // Word-wrap at canvas width
@@ -335,7 +378,7 @@ export function Forge() {
 
   useEffect(() => {
     render();
-  }, [render]);
+  }, [render, imgTick]);
 
   /* ---------------- gallery persistence ---------------- */
 
@@ -368,6 +411,7 @@ export function Forge() {
       persistUserMemes(next);
       return next;
     });
+    earn("meme_post"); // +50 HP, counts toward Meme Lord badge
     fireConfetti({ count: 90 });
   }
 
@@ -381,6 +425,19 @@ export function Forge() {
     const nextVoted = [...voted, id];
     setVoted(nextVoted);
     store.set(LS.memeVotes, nextVoted);
+    earn("upvote"); // +5 HP, counts toward Voice of the Herd badge
+  }
+
+  /** Upload a custom image as a reusable meme template. */
+  async function onTemplateUpload(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const dataUrl = await fileToDataUrl(file, 1080);
+    const asset = await saveAsset(file.name.replace(/\.\w+$/, ""), "template", dataUrl);
+    const all = await listAssets();
+    setCustomTemplates(all.filter((a) => a.category === "template" || a.category === "background"));
+    setTemplate(assetToTemplate(asset));
+    e.target.value = "";
   }
 
   /* ---------------- actions ---------------- */
@@ -497,7 +554,7 @@ export function Forge() {
             <div>
               <span className={labelCls}>Template</span>
               <div className="mt-2 grid grid-cols-2 gap-2">
-                {TEMPLATES.map((t) => (
+                {allTemplates.map((t) => (
                   <button
                     key={t.id}
                     onClick={() => setTemplate(t)}
@@ -511,6 +568,10 @@ export function Forge() {
                     {t.name}
                   </button>
                 ))}
+                <label className="flex cursor-pointer items-center justify-center gap-1.5 border border-dashed border-gold/30 px-3 py-2.5 font-display text-[10px] uppercase tracking-wider text-ash transition-colors hover:border-gold/60 hover:text-gold">
+                  <ImagePlus size={12} /> Add your own
+                  <input type="file" accept="image/*" className="hidden" onChange={onTemplateUpload} />
+                </label>
               </div>
             </div>
 
@@ -544,7 +605,7 @@ export function Forge() {
               <div>
                 <span className={labelCls}>Color</span>
                 <div className="mt-1.5 flex gap-1.5">
-                  {["#EDE8DC", "#FFD700", "#FF2E2E", "#16C784"].map((c) => (
+                  {["#EDE8DC", "#D4AF37", "#FF2E2E", "#16C784"].map((c) => (
                     <button
                       key={c}
                       onClick={() => setTextColor(c)}

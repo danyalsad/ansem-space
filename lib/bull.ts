@@ -4,6 +4,8 @@
  * Coordinate space: 100 x 100.
  */
 
+import { CRIMSON_BRIGHT, GOLD, PANEL, VOID } from "@/lib/palette";
+
 export const BULL_HORN_LEFT = "M35 33 L14 25 L3 5 Q16 13 24 18 L38 27 Z";
 export const BULL_HORN_RIGHT = "M65 33 L86 25 L97 5 Q84 13 76 18 L62 27 Z";
 export const BULL_HEAD =
@@ -45,24 +47,21 @@ export function drawBull(
     return;
   }
 
-  const gold = "#FFD700";
-  const dark = "#141317";
-
-  ctx.fillStyle = gold;
+  ctx.fillStyle = GOLD;
   ctx.fill(horns);
   ctx.fill(hornsR);
 
-  ctx.fillStyle = variant === "gold" ? dark : "#0A0A0A";
+  ctx.fillStyle = variant === "gold" ? PANEL : VOID;
   ctx.fill(head);
-  ctx.strokeStyle = gold;
+  ctx.strokeStyle = GOLD;
   ctx.lineWidth = 2.5;
   ctx.stroke(head);
 
-  ctx.fillStyle = "#FF2E2E";
+  ctx.fillStyle = CRIMSON_BRIGHT;
   ctx.fill(eyeL);
   ctx.fill(eyeR);
 
-  ctx.fillStyle = gold;
+  ctx.fillStyle = GOLD;
   ctx.fill(blaze);
   ctx.fill(nose);
 

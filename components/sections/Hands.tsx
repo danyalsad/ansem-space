@@ -15,6 +15,7 @@ import { SectionHeader } from "@/components/SectionHeader";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { useWallet } from "@/components/WalletProvider";
+import { useMarket } from "@/components/MarketProvider";
 import { drawBull } from "@/lib/bull";
 import { shareOnX } from "@/lib/constants";
 import { fireConfetti } from "@/lib/confetti";
@@ -22,7 +23,19 @@ import { cn, formatUsd, hashString, seededRandom, shortAddress } from "@/lib/uti
 
 /* ---------------- animated stat counter ---------------- */
 
-function StatTile({ value, suffix, label, accent }: { value: number; suffix: string; label: string; accent?: boolean }) {
+function StatTile({
+  value,
+  suffix,
+  label,
+  accent,
+  format,
+}: {
+  value: number;
+  suffix: string;
+  label: string;
+  accent?: boolean;
+  format?: (v: number) => string;
+}) {
   const ref = useRef<HTMLDivElement>(null);
   const inView = useInView(ref, { once: true, margin: "-60px" });
   const mv = useMotionValue(0);
@@ -35,9 +48,10 @@ function StatTile({ value, suffix, label, accent }: { value: number; suffix: str
 
   useEffect(() => {
     return spring.on("change", (v) => {
-      setDisplay(v >= 1000 ? Math.round(v).toLocaleString() : v.toFixed(v < 100 ? 0 : 0));
+      if (format) setDisplay(format(v));
+      else setDisplay(v >= 1000 ? Math.round(v).toLocaleString() : v.toFixed(0));
     });
-  }, [spring]);
+  }, [spring, format]);
 
   return (
     <div
@@ -102,17 +116,17 @@ function generateStoryCard(name: string, story: string, tierLabel: string): stri
   ctx.fillStyle = "#0A0A0A";
   ctx.fillRect(0, 0, 1200, 675);
   const g = ctx.createRadialGradient(600, 340, 60, 600, 340, 700);
-  g.addColorStop(0, "rgba(255,215,0,0.14)");
-  g.addColorStop(1, "rgba(255,215,0,0)");
+  g.addColorStop(0, "rgba(212,175,55,0.14)");
+  g.addColorStop(1, "rgba(212,175,55,0)");
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, 1200, 675);
-  ctx.strokeStyle = "rgba(255,215,0,0.5)";
+  ctx.strokeStyle = "rgba(212,175,55,0.5)";
   ctx.lineWidth = 6;
   ctx.strokeRect(24, 24, 1152, 627);
 
   drawBull(ctx, 60, 60, 130, "gold");
 
-  ctx.fillStyle = "#FFD700";
+  ctx.fillStyle = "#D4AF37";
   ctx.font = "900 44px Impact, sans-serif";
   ctx.fillText("MY DIAMOND HANDS STORY", 230, 125);
   ctx.fillStyle = "#8B8694";
@@ -146,12 +160,13 @@ function generateStoryCard(name: string, story: string, tierLabel: string): stri
 
 export function Hands() {
   const { address, connect, connecting } = useWallet();
+  const market = useMarket();
   const status = address ? getWalletStatus(address) : null;
 
-  // "What if you held" calculator
+  // "What if you held" calculator — held side uses the LIVE price.
   const [airdropAmount, setAirdropAmount] = useState(1_000_000);
-  const heldValue = airdropAmount * 0.0042; // simulated current price
-  const soldValue = airdropAmount * 0.00031; // simulated airdrop-day price
+  const heldValue = airdropAmount * market.price;
+  const soldValue = airdropAmount * market.price * 0.074; // assumed early exit near launch price
 
   // Story modal
   const [storyOpen, setStoryOpen] = useState(false);
@@ -175,12 +190,34 @@ export function Hands() {
           sub="This coin runs on grip strength. Check the herd's stats, reveal your own status, and immortalize your diamond-hands story. Paperhands enter at their own risk."
         />
 
-        {/* Top stats (simulated) */}
+        {/* Live market stats via DexScreener */}
         <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-          <StatTile value={83} suffix="%" label="Airdrop recipients still holding" accent />
-          <StatTile value={2400000} suffix="" label="USD value distributed by Ansem (est.)" />
-          <StatTile value={12847} suffix="" label="Certified diamond hands" accent />
-          <StatTile value={3201} suffix="" label="Paperhands trampled (R.I.P.)" />
+          <StatTile
+            value={market.price}
+            suffix=""
+            label={market.live ? "Live price (DexScreener)" : "Price (connecting…)"}
+            accent
+            format={(v) => `$${v < 0.001 ? v.toFixed(7) : v.toFixed(5)}`}
+          />
+          <StatTile
+            value={market.marketCap}
+            suffix=""
+            label="Market cap"
+            format={(v) => formatUsd(v, 0)}
+          />
+          <StatTile
+            value={market.volume24h}
+            suffix=""
+            label="24h volume"
+            accent
+            format={(v) => formatUsd(v, 0)}
+          />
+          <StatTile
+            value={market.change24h}
+            suffix="%"
+            label="24h change"
+            format={(v) => `${v >= 0 ? "+" : ""}${v.toFixed(1)}`}
+          />
         </div>
 
         <div className="mt-12 grid gap-8 lg:grid-cols-2">

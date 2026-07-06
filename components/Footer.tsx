@@ -1,6 +1,7 @@
 import { BullLogo } from "@/components/BullLogo";
 import { ContractAddress } from "@/components/ContractAddress";
-import { LINKS, TAGLINE } from "@/lib/constants";
+import { CREATOR_WALLET, LINKS, TAGLINE } from "@/lib/constants";
+import { shortAddress } from "@/lib/utils";
 
 export function Footer() {
   return (
@@ -68,7 +69,31 @@ export function Footer() {
           </div>
         </div>
 
-        <div className="mt-12 flex flex-col items-center justify-between gap-3 border-t border-edge/60 pt-6 text-[11px] text-ash sm:flex-row">
+        {/* Credits */}
+        <div className="mt-12 border-t border-edge/60 pt-8">
+          <h4 className="font-display text-xs uppercase tracking-[0.3em] text-gold">Credits</h4>
+          <div className="mt-4 flex flex-col gap-2 text-xs text-ash sm:flex-row sm:items-center sm:gap-6">
+            <span>
+              Built for the <span className="text-gold">$ANSEM</span> community 🐂
+            </span>
+            <span className="font-mono" title={CREATOR_WALLET}>
+              Creator: <span className="text-bone">{shortAddress(CREATOR_WALLET, 6)}</span>
+            </span>
+            <a
+              href={LINKS.creatorX}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-mono text-gold transition-colors hover:text-gold-glow"
+            >
+              𝕏 @DannyMD_UK
+            </a>
+            <a href="/admin" className="font-mono text-ash/60 transition-colors hover:text-ash">
+              admin
+            </a>
+          </div>
+        </div>
+
+        <div className="mt-8 flex flex-col items-center justify-between gap-3 border-t border-edge/60 pt-6 text-[11px] text-ash sm:flex-row">
           <span>© 2026 ANSEM Space · Built by the herd 🐂</span>
           <span className="font-mono">ansem.space — hold the line.</span>
         </div>

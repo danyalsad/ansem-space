@@ -1,71 +1,53 @@
 "use client";
 
 /**
- * Simulated Solana wallet connection.
- * Generates a plausible address, persists it in localStorage, and exposes
- * connect / disconnect with a short "connecting…" delay so it feels real.
+ * Real Solana wallet connection via @solana/wallet-adapter.
+ * Supports Phantom, Solflare, and any Wallet-Standard wallet (auto-detected).
+ *
+ * The rest of the app consumes the same minimal facade as before —
+ * useWallet() → { address, connecting, connect, disconnect } — so swapping
+ * from the old simulated wallet required no changes elsewhere.
  */
 
+import { useMemo, type ReactNode } from "react";
 import {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useState,
-  type ReactNode,
-} from "react";
-import { LS } from "@/lib/constants";
-import { fakeSolAddress, store } from "@/lib/utils";
-import { fireConfetti } from "@/lib/confetti";
+  ConnectionProvider,
+  WalletProvider as SolanaWalletProvider,
+  useWallet as useSolanaWallet,
+} from "@solana/wallet-adapter-react";
+import { WalletModalProvider, useWalletModal } from "@solana/wallet-adapter-react-ui";
+import { PhantomWalletAdapter } from "@solana/wallet-adapter-phantom";
+import { SolflareWalletAdapter } from "@solana/wallet-adapter-solflare";
 
-interface WalletState {
-  address: string | null;
-  connecting: boolean;
-  connect: () => void;
-  disconnect: () => void;
-}
-
-const WalletContext = createContext<WalletState>({
-  address: null,
-  connecting: false,
-  connect: () => {},
-  disconnect: () => {},
-});
+// Public mainnet RPC — we only need it for connection context, not queries.
+const ENDPOINT = "https://api.mainnet-beta.solana.com";
 
 export function WalletProvider({ children }: { children: ReactNode }) {
-  const [address, setAddress] = useState<string | null>(null);
-  const [connecting, setConnecting] = useState(false);
-
-  // Restore a previously "connected" wallet.
-  useEffect(() => {
-    setAddress(store.get<string | null>(LS.wallet, null));
-  }, []);
-
-  const connect = useCallback(() => {
-    if (connecting) return;
-    setConnecting(true);
-    // Simulate the wallet-extension approval round-trip.
-    setTimeout(() => {
-      const addr = fakeSolAddress();
-      store.set(LS.wallet, addr);
-      setAddress(addr);
-      setConnecting(false);
-      fireConfetti({ count: 80 });
-    }, 900);
-  }, [connecting]);
-
-  const disconnect = useCallback(() => {
-    store.remove(LS.wallet);
-    setAddress(null);
-  }, []);
+  const wallets = useMemo(
+    () => [new PhantomWalletAdapter(), new SolflareWalletAdapter()],
+    []
+  );
 
   return (
-    <WalletContext.Provider value={{ address, connecting, connect, disconnect }}>
-      {children}
-    </WalletContext.Provider>
+    <ConnectionProvider endpoint={ENDPOINT}>
+      <SolanaWalletProvider wallets={wallets} autoConnect>
+        <WalletModalProvider>{children}</WalletModalProvider>
+      </SolanaWalletProvider>
+    </ConnectionProvider>
   );
 }
 
+/** App-facing facade over the wallet adapter. */
 export function useWallet() {
-  return useContext(WalletContext);
+  const { publicKey, connecting, disconnect } = useSolanaWallet();
+  const { setVisible } = useWalletModal();
+
+  return {
+    address: publicKey ? publicKey.toBase58() : null,
+    connecting,
+    connect: () => setVisible(true),
+    disconnect: () => {
+      void disconnect();
+    },
+  };
 }

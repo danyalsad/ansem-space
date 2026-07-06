@@ -11,7 +11,11 @@ export const LINKS = {
   pumpFun: `https://pump.fun/coin/${CONTRACT_ADDRESS}`,
   jupiter: `https://jup.ag/swap/SOL-${CONTRACT_ADDRESS}`,
   ansemX: "https://x.com/blknoiz06",
+  creatorX: "https://x.com/DannyMD_UK",
 };
+
+/** Site creator — connects to unlock the admin asset manager at /admin. */
+export const CREATOR_WALLET = "3bdYdaDkjvKDST9zzjAZRpsodpd7DpU618QgMdpwtfWM";
 
 export const HASHTAGS = "#ANSEM #Solana #TheBlackBull";
 
