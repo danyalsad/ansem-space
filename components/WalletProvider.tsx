@@ -39,7 +39,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
 
 /** App-facing facade over the wallet adapter. */
 export function useWallet() {
-  const { publicKey, connecting, disconnect } = useSolanaWallet();
+  const { publicKey, connecting, disconnect, signMessage } = useSolanaWallet();
   const { setVisible } = useWalletModal();
 
   return {
@@ -49,5 +49,7 @@ export function useWallet() {
     disconnect: () => {
       void disconnect();
     },
+    /** Sign an arbitrary message (admin auth). Undefined if unsupported. */
+    signMessage,
   };
 }

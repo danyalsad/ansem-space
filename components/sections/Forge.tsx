@@ -265,22 +265,27 @@ export function Forge() {
   const [sort, setSort] = useState<SortMode>("top");
   const [uploadCaption, setUploadCaption] = useState("");
 
-  /* ---------------- custom templates ---------------- */
+  /* ---------------- custom + global templates ---------------- */
 
-  /** Wrap an uploaded asset as a canvas template (cover-fit background). */
-  const assetToTemplate = useCallback((asset: SiteAsset): Template => {
+  // Global (admin-uploaded, Blob-hosted) assets — same for every visitor.
+  const [slotOverrides, setSlotOverrides] = useState<Record<string, string>>({});
+  const [globalLibrary, setGlobalLibrary] = useState<Array<{ id: string; name: string; url: string; category: string }>>([]);
+
+  /** Wrap an image (local dataURL or remote Blob URL) as a canvas template. */
+  const imageTemplate = useCallback((id: string, name: string, src: string): Template => {
     return {
-      id: asset.id,
-      name: asset.name,
+      id,
+      name,
       draw: (ctx, w, h) => {
         ctx.fillStyle = "#0A0A0A";
         ctx.fillRect(0, 0, w, h);
-        let img = templateImgCache.current.get(asset.id);
+        let img = templateImgCache.current.get(id);
         if (!img) {
           img = new Image();
+          if (src.startsWith("http")) img.crossOrigin = "anonymous"; // keep canvas exportable
           img.onload = () => setImgTick((t) => t + 1);
-          img.src = asset.dataUrl;
-          templateImgCache.current.set(asset.id, img);
+          img.src = src;
+          templateImgCache.current.set(id, img);
         }
         if (img.complete && img.width > 0) {
           const scale = Math.max(w / img.width, h / img.height);
@@ -292,13 +297,46 @@ export function Forge() {
     };
   }, []);
 
+  const assetToTemplate = useCallback(
+    (asset: SiteAsset): Template => imageTemplate(asset.id, asset.name, asset.dataUrl),
+    [imageTemplate]
+  );
+
   useEffect(() => {
+    // Personal templates (this browser only)
     listAssets().then((all) =>
       setCustomTemplates(all.filter((a) => a.category === "template" || a.category === "background"))
     );
+    // Global assets (admin uploads on Vercel Blob)
+    fetch("/api/assets")
+      .then((r) => r.json())
+      .then((json: { slots: Record<string, { url: string; uploadedAt: string }>; library: Array<{ url: string; pathname: string; name: string; category: string }> }) => {
+        const overrides: Record<string, string> = {};
+        for (const [slot, v] of Object.entries(json.slots ?? {})) {
+          if (slot.startsWith("template-")) {
+            overrides[slot.replace("template-", "")] = `${v.url}?v=${v.uploadedAt}`;
+          }
+        }
+        setSlotOverrides(overrides);
+        setGlobalLibrary(
+          (json.library ?? []).map((a) => ({ id: a.pathname, name: a.name, url: a.url, category: a.category }))
+        );
+      })
+      .catch(() => {});
   }, []);
 
-  const allTemplates: Template[] = [...TEMPLATES, ...customTemplates.map(assetToTemplate)];
+  const allTemplates: Template[] = [
+    // Built-ins — replaced by the HD version when the admin uploaded one.
+    ...TEMPLATES.map((t) =>
+      slotOverrides[t.id] ? imageTemplate(t.id, t.name, slotOverrides[t.id]) : t
+    ),
+    ...globalLibrary
+      .filter((a) => a.category === "template" || a.category === "background")
+      .map((a) => imageTemplate(a.id, a.name, a.url)),
+    ...customTemplates.map(assetToTemplate),
+  ];
+
+  const globalStickers = globalLibrary.filter((a) => a.category === "sticker");
 
   /* ---------------- canvas render ---------------- */
 
@@ -660,6 +698,34 @@ export function Forge() {
                 <ImagePlus size={14} /> {stickerLoaded ? "Replace sticker" : "Upload image"}
                 <input type="file" accept="image/*" className="hidden" onChange={onStickerUpload} />
               </label>
+              {globalStickers.length > 0 && (
+                <div className="mt-2">
+                  <span className="font-mono text-[9px] uppercase tracking-widest text-ash/70">
+                    Community sticker pack
+                  </span>
+                  <div className="mt-1.5 grid grid-cols-5 gap-1.5">
+                    {globalStickers.slice(0, 10).map((s) => (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        key={s.id}
+                        src={s.url}
+                        alt={s.name}
+                        title={s.name}
+                        className="aspect-square cursor-pointer border border-edge object-contain p-0.5 transition-all hover:border-gold"
+                        onClick={() => {
+                          const img = new Image();
+                          img.crossOrigin = "anonymous";
+                          img.onload = () => {
+                            stickerRef.current = img;
+                            setStickerLoaded(true);
+                          };
+                          img.src = s.url;
+                        }}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
               {stickerLoaded && (
                 <div className="mt-2 grid grid-cols-5 gap-1.5">
                   {(["tl", "tr", "c", "bl", "br"] as const).map((p) => (

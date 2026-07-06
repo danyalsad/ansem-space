@@ -6,6 +6,7 @@ import { WalletProvider } from "@/components/WalletProvider";
 import { MarketProvider } from "@/components/MarketProvider";
 import { HerdProvider } from "@/components/HerdProvider";
 import { EffectsLayer } from "@/components/EffectsLayer";
+import { slotUrl } from "@/lib/asset-manifest";
 import { CONTRACT_ADDRESS, SITE_NAME, SITE_URL, TAGLINE } from "@/lib/constants";
 
 const display = Unbounded({
@@ -24,29 +25,39 @@ const mono = JetBrains_Mono({
   variable: "--font-mono",
 });
 
+// Brand assets live at permanent Blob URLs — replaceable from /admin
+// without a redeploy (see lib/asset-manifest.ts).
+const OG_IMAGE = slotUrl("og-image");
+const FAVICON = slotUrl("favicon");
+
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: `${SITE_NAME} — The Home of the $ANSEM Herd`,
   description: `${TAGLINE} The ultimate $ANSEM (The Black Bull) community hub: meme forge, endless-runner game, Herd Points, diamond-hands culture, lore archive and live market intel. CA: ${CONTRACT_ADDRESS}`,
   keywords: ["ANSEM", "$ANSEM", "The Black Bull", "Solana", "meme coin", "pump.fun", "Ansem"],
+  alternates: { canonical: SITE_URL },
   openGraph: {
     title: `${SITE_NAME} — Forge Memes. Charge Forward. Hold the Line.`,
     description: `The central home for the $ANSEM community on Solana. Memes, games, Herd Points and live market intel.`,
     url: SITE_URL,
     siteName: SITE_NAME,
     type: "website",
+    locale: "en_US",
+    images: [{ url: OG_IMAGE, width: 1200, height: 630, alt: "ANSEM Space — The Home of the $ANSEM Herd" }],
   },
   twitter: {
     card: "summary_large_image",
     title: `${SITE_NAME} — The Home of the $ANSEM Herd`,
     description: TAGLINE,
+    creator: "@DannyMD_UK",
+    images: [OG_IMAGE],
   },
   icons: {
-    // Inline SVG bull favicon — no asset pipeline needed.
-    icon: `data:image/svg+xml,${encodeURIComponent(
-      `<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><rect width="100" height="100" fill="#0A0A0A"/><path d="M35 33 L14 25 L3 5 Q16 13 24 18 L38 27 Z" fill="#D4AF37"/><path d="M65 33 L86 25 L97 5 Q84 13 76 18 L62 27 Z" fill="#D4AF37"/><path d="M33 29 L67 29 L78 45 L71 72 L58 87 L50 95 L42 87 L29 72 L22 45 Z" fill="#141317" stroke="#D4AF37" stroke-width="2.5"/><path d="M36 49 L46 53 L37 58 Z" fill="#FF2E2E"/><path d="M64 49 L54 53 L63 58 Z" fill="#FF2E2E"/><path d="M50 33 L53 45 L50 66 L47 45 Z" fill="#D4AF37"/><path d="M44 76 L50 80 L56 76 L50 84 Z" fill="#D4AF37"/></svg>`
-    )}`,
+    icon: [{ url: FAVICON, type: "image/png", sizes: "512x512" }],
+    apple: [{ url: FAVICON, sizes: "512x512" }],
+    shortcut: FAVICON,
   },
+  robots: { index: true, follow: true },
 };
 
 export const viewport: Viewport = {
