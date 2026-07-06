@@ -4,7 +4,7 @@
 > recent state before pushing.** A stale handoff is worse than none — treat
 > updating it as part of the commit, not an afterthought.
 
-Last updated: 2026-07-06 · v6 engagement wave (quests, referrals, polls, creator spotlight)
+Last updated: 2026-07-06 · v7 design overhaul + seeded default graphics
 
 ## What this is
 
@@ -62,12 +62,15 @@ route rewrites the URL to `sslmode=no-verify`. Don't remove that.
 - `lib/palette.ts` — single source of color truth for ALL canvas renderers/logo/favicon (gold `#D4AF37`, crimson `#C8102E`; the original bright `#FFD700` was explicitly rejected — never reintroduce it)
 - `lib/bull.ts` — shared bull-mark SVG path constants + `drawBull()`
 - `lib/points.ts` — Herd Points engine: POINT_VALUES (meme 50, upvote 5, story 100, intel 20, share 15, game score÷50 max 400, daily 25+streak up to 70 + milestone bonuses at 7/14/30 days), 14 badges, quest progress on PlayerData, week keys, guest merge
-- `lib/asset-manifest.ts` — 15 asset slots (branding / templates / game sprites / story) with names, descriptions, dimensions, live flags
+- `lib/asset-manifest.ts` — 15 asset slots (all live), SLOT_USAGE map for /admin, permanent Blob URLs
+- `scripts/seed-assets.mjs` — regenerates + uploads all slot PNGs (`npm run seed-assets`, needs BLOB_READ_WRITE_TOKEN)
 - `lib/admin-auth.ts` — wallet-signature auth: message `ansem-space-admin|<unix ms>`, tweetnacl verify vs CREATOR_WALLET, 10-min freshness
 - `lib/supabase-server.ts` — service-role client (server only) + wallet regex validator
 - `app/api/` — `herd`, `memes` (+ `memes/vote`), `polls` (global community polls), `referrals` (signup + code registration), `assets`, `holders`, `whales`, `migrate`
 - `app/admin/page.tsx` — creator-wallet-gated asset manager (slot cards + free library). No footer link — navigate to /admin directly.
 - `components/HerdProvider.tsx` — earn() + grantBonus() + toasts, quest progress on earn, daily auto-claim, guest merge, debounced Supabase sync
+- `components/Atmosphere.tsx` — global cinematic background layers
+- `components/ui/Panel.tsx` — horn-clip premium panels (gold/crimson/glass variants)
 - `components/CreatorSpotlight.tsx` — "Built by Dr Danny" hero banner + Hall of Builders (#builders)
 - `components/AchievementRoadmap.tsx` — visual HP milestones + badge progress grid
 - `components/sections/` — Forge (+ weekly Meme Battle contest banner), Charge (+ daily challenge +50 HP), Quests (daily/weekly missions, referrals, roadmap), Herd, Hands, Lore, Intel (global poll via /api/polls, local fallback)

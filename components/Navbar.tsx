@@ -196,7 +196,7 @@ export function Navbar() {
   }
 
   return (
-    <header className="fixed inset-x-0 top-0 z-50 border-b border-gold/15 bg-void/85 backdrop-blur-md">
+    <header className="nav-glass fixed inset-x-0 top-0 z-50 border-b border-gold/20 edge-glow-top">
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-3 px-4 sm:px-6">
         {/* Logo + wordmark */}
         <a

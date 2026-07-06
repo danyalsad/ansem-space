@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { useWallet } from "@/components/WalletProvider";
 import { useHerd } from "@/components/HerdProvider";
 import { drawBull } from "@/lib/bull";
+import { slotUrl } from "@/lib/asset-manifest";
 import { LS, shareOnX } from "@/lib/constants";
 import { BONE, CRIMSON_BRIGHT, GOLD, GOLD_BRIGHT, VOID } from "@/lib/palette";
 import { fireConfetti } from "@/lib/confetti";
@@ -66,6 +67,15 @@ const BULL_SIZE = 64;
 const GRAVITY = 2200;
 const JUMP_V = -840;
 
+type SpriteKey = "bull" | "paperhand" | "beartrap" | "coin" | "solbag";
+const SPRITE_SLOTS: Record<string, SpriteKey> = {
+  "sprite-bull-runner": "bull",
+  "sprite-paperhand": "paperhand",
+  "sprite-beartrap": "beartrap",
+  "sprite-coin": "coin",
+  "sprite-solbag": "solbag",
+};
+
 /** Deterministic daily challenge derived from today's date. */
 function getDailyChallenge(): { id: string; label: string; check: (s: { coins: number; score: number; time: number }) => boolean } {
   const day = new Date().toISOString().slice(0, 10);
@@ -110,6 +120,32 @@ export function Charge() {
   const [playerScores, setPlayerScores] = useState<Array<{ name: string; score: number }>>([]);
   const [dailyDone, setDailyDone] = useState(false);
   const daily = useRef(getDailyChallenge());
+  const sprites = useRef<Partial<Record<SpriteKey, HTMLImageElement>>>({});
+
+  useEffect(() => {
+    const load = (slot: string, key: SpriteKey, url: string) => {
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+      img.onload = () => {
+        sprites.current[key] = img;
+      };
+      img.src = url;
+    };
+    fetch("/api/assets")
+      .then((r) => r.json())
+      .then((json) => {
+        for (const [slot, key] of Object.entries(SPRITE_SLOTS)) {
+          const s = json.slots?.[slot];
+          const url = s?.url ? `${s.url}?v=${s.uploadedAt}` : slotUrl(slot);
+          load(slot, key, url);
+        }
+      })
+      .catch(() => {
+        for (const [slot, key] of Object.entries(SPRITE_SLOTS)) {
+          load(slot, key, slotUrl(slot));
+        }
+      });
+  }, []);
 
   useEffect(() => {
     setHighScore(store.get<number>(LS.highScore, 0));
@@ -152,42 +188,58 @@ export function Charge() {
       const cx = e.x + e.w / 2;
       const cy = e.y + e.h / 2;
       if (e.kind === "coin") {
-        ctx.save();
-        ctx.shadowColor = GOLD;
-        ctx.shadowBlur = 12;
-        ctx.fillStyle = GOLD;
-        ctx.beginPath();
-        ctx.arc(cx, cy, e.w / 2, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.shadowBlur = 0;
-        ctx.fillStyle = VOID;
-        ctx.font = "900 15px Impact, sans-serif";
-        ctx.fillText("A", cx, cy + 1);
-        ctx.restore();
+        const coin = sprites.current.coin;
+        if (coin) {
+          ctx.drawImage(coin, e.x, e.y, e.w, e.h);
+        } else {
+          ctx.save();
+          ctx.shadowColor = GOLD;
+          ctx.shadowBlur = 12;
+          ctx.fillStyle = GOLD;
+          ctx.beginPath();
+          ctx.arc(cx, cy, e.w / 2, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.restore();
+        }
       } else if (e.kind === "solbag") {
-        ctx.font = `${e.h}px sans-serif`;
-        ctx.fillText("💰", cx, cy);
+        const bag = sprites.current.solbag;
+        if (bag) ctx.drawImage(bag, e.x, e.y, e.w, e.h);
+        else {
+          ctx.font = `${e.h}px sans-serif`;
+          ctx.fillText("💰", cx, cy);
+        }
       } else if (e.kind === "paperhand") {
-        ctx.font = `${e.h}px sans-serif`;
-        ctx.fillText("🧻", cx, cy);
-        ctx.fillStyle = "rgba(255,46,46,0.9)";
-        ctx.font = "700 11px monospace";
-        ctx.fillText("PAPER", cx, e.y + e.h + 10);
+        const ph = sprites.current.paperhand;
+        if (ph) ctx.drawImage(ph, e.x, e.y, e.w, e.h);
+        else {
+          ctx.font = `${e.h}px sans-serif`;
+          ctx.fillText("🧻", cx, cy);
+        }
       } else {
-        ctx.font = `${e.h}px sans-serif`;
-        ctx.fillText("🐻", cx, cy);
-        ctx.strokeStyle = CRIMSON_BRIGHT;
-        ctx.lineWidth = 2;
-        ctx.strokeRect(e.x, e.y + e.h - 6, e.w, 6);
+        const bear = sprites.current.beartrap;
+        if (bear) ctx.drawImage(bear, e.x, e.y, e.w, e.h);
+        else {
+          ctx.font = `${e.h}px sans-serif`;
+          ctx.fillText("🐻", cx, cy);
+        }
       }
     }
 
-    // The bull (drawn mark + motion trail)
-    ctx.save();
-    ctx.globalAlpha = 0.25;
-    drawBull(ctx, BULL_X - 22, g.bullY + 6, BULL_SIZE * 0.9, "silhouette");
-    ctx.restore();
-    drawBull(ctx, BULL_X, g.bullY, BULL_SIZE, "gold");
+    // The bull — sprite from Blob or procedural fallback
+    const bullImg = sprites.current.bull;
+    if (bullImg) {
+      ctx.save();
+      ctx.globalAlpha = 0.3;
+      ctx.drawImage(bullImg, BULL_X - 18, g.bullY + 8, BULL_SIZE * 0.9, BULL_SIZE * 0.9);
+      ctx.restore();
+      ctx.drawImage(bullImg, BULL_X, g.bullY, BULL_SIZE, BULL_SIZE);
+    } else {
+      ctx.save();
+      ctx.globalAlpha = 0.25;
+      drawBull(ctx, BULL_X - 22, g.bullY + 6, BULL_SIZE * 0.9, "silhouette");
+      ctx.restore();
+      drawBull(ctx, BULL_X, g.bullY, BULL_SIZE, "gold");
+    }
 
     // Floating reward popups
     ctx.textAlign = "center";

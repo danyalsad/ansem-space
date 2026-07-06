@@ -1,3 +1,4 @@
+import { Atmosphere } from "@/components/Atmosphere";
 import { Navbar } from "@/components/Navbar";
 import { Hero } from "@/components/Hero";
 import { CreatorSpotlight } from "@/components/CreatorSpotlight";
@@ -13,7 +14,8 @@ import { FloatingCTA } from "@/components/FloatingCTA";
 
 export default function Home() {
   return (
-    <main className="relative">
+    <main className="relative z-[2]">
+      <Atmosphere variant="hero" />
       <Navbar />
       <Hero />
       <CreatorSpotlight />

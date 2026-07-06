@@ -101,14 +101,14 @@ export const ASSET_SLOTS: AssetSlot[] = [
     live: true,
   },
 
-  /* ---------- Charge game sprites (uploaded now, wired in next update) ---------- */
+  /* ---------- Charge game sprites (live in Charge canvas) ---------- */
   {
     slot: "sprite-bull-runner",
     name: "Game sprite — running bull",
     description: "The player character in Charge. MUST FACE RIGHT. Clean silhouette reads best at small size.",
     spec: "256×256 · PNG · transparent",
     group: "sprite",
-    live: false,
+    live: true,
   },
   {
     slot: "sprite-paperhand",
@@ -116,7 +116,7 @@ export const ASSET_SLOTS: AssetSlot[] = [
     description: "Replaces the 🧻 emoji obstacle. Something jumpable-looking: toilet-paper hands, tissue ghost, etc.",
     spec: "256×256 · PNG · transparent",
     group: "sprite",
-    live: false,
+    live: true,
   },
   {
     slot: "sprite-beartrap",
@@ -124,7 +124,7 @@ export const ASSET_SLOTS: AssetSlot[] = [
     description: "Replaces the 🐻 emoji obstacle. A low, wide bear/trap shape.",
     spec: "256×256 · PNG · transparent",
     group: "sprite",
-    live: false,
+    live: true,
   },
   {
     slot: "sprite-coin",
@@ -132,7 +132,7 @@ export const ASSET_SLOTS: AssetSlot[] = [
     description: "Gold coin with the bull or 'A'. Replaces the drawn gold circle.",
     spec: "256×256 · PNG · transparent",
     group: "sprite",
-    live: false,
+    live: true,
   },
   {
     slot: "sprite-solbag",
@@ -140,7 +140,7 @@ export const ASSET_SLOTS: AssetSlot[] = [
     description: "Replaces the 💰 emoji. A money bag / SOL-branded sack.",
     spec: "256×256 · PNG · transparent",
     group: "sprite",
-    live: false,
+    live: true,
   },
 
   /* ---------- Share cards ---------- */
@@ -150,9 +150,28 @@ export const ASSET_SLOTS: AssetSlot[] = [
     description: "Background for the shareable 'My Diamond Hands Story' cards generated in the Hands section.",
     spec: "1200×675 · JPG/PNG · dark, low-contrast center",
     group: "card",
-    live: false,
+    live: true,
   },
 ];
+
+/** Where each slot is consumed — shown in /admin for Danny. */
+export const SLOT_USAGE: Record<string, string> = {
+  "og-image": "layout.tsx · OpenGraph / X cards",
+  favicon: "layout.tsx · browser tab + apple icon",
+  "logo-bull": "BullLogo · Hero · Navbar · Effects",
+  "banner-x": "X community profile (download & upload to X)",
+  "template-golden-charge": "Forge meme generator",
+  "template-red-candle-god": "Forge meme generator",
+  "template-moon-mission": "Forge meme generator",
+  "template-paperhands-down": "Forge meme generator",
+  "template-blank-void": "Forge meme generator",
+  "sprite-bull-runner": "Charge game · player character",
+  "sprite-paperhand": "Charge game · obstacle",
+  "sprite-beartrap": "Charge game · obstacle",
+  "sprite-coin": "Charge game · collectible",
+  "sprite-solbag": "Charge game · collectible",
+  "story-card-bg": "Hands · diamond-hands share cards",
+};
 
 export const SLOT_GROUP_LABELS: Record<SlotGroup, string> = {
   branding: "Branding & SEO",

@@ -21,6 +21,7 @@ import { useHerd } from "@/components/HerdProvider";
 import { useMarket } from "@/components/MarketProvider";
 import { useWallet } from "@/components/WalletProvider";
 import { drawBull } from "@/lib/bull";
+import { slotUrl } from "@/lib/asset-manifest";
 import { shareOnX } from "@/lib/constants";
 import { fireConfetti } from "@/lib/confetti";
 import { BADGES } from "@/lib/points";
@@ -89,25 +90,35 @@ function getTier(totalHp: number) {
 
 /* ---------------- share-card generation ---------------- */
 
-function generateStoryCard(name: string, story: string, tierLabel: string): string | null {
+function generateStoryCard(
+  name: string,
+  story: string,
+  tierLabel: string,
+  bg?: HTMLImageElement | null
+): string | null {
   const canvas = document.createElement("canvas");
   canvas.width = 1200;
   canvas.height = 675;
   const ctx = canvas.getContext("2d");
   if (!ctx) return null;
 
-  ctx.fillStyle = "#0A0A0A";
-  ctx.fillRect(0, 0, 1200, 675);
-  const g = ctx.createRadialGradient(600, 340, 60, 600, 340, 700);
-  g.addColorStop(0, "rgba(212,175,55,0.14)");
-  g.addColorStop(1, "rgba(212,175,55,0)");
-  ctx.fillStyle = g;
-  ctx.fillRect(0, 0, 1200, 675);
-  ctx.strokeStyle = "rgba(212,175,55,0.5)";
-  ctx.lineWidth = 6;
-  ctx.strokeRect(24, 24, 1152, 627);
-
-  drawBull(ctx, 60, 60, 130, "gold");
+  if (bg) {
+    ctx.drawImage(bg, 0, 0, 1200, 675);
+    ctx.fillStyle = "rgba(10,10,10,0.42)";
+    ctx.fillRect(0, 0, 1200, 675);
+  } else {
+    ctx.fillStyle = "#0A0A0A";
+    ctx.fillRect(0, 0, 1200, 675);
+    const g = ctx.createRadialGradient(600, 340, 60, 600, 340, 700);
+    g.addColorStop(0, "rgba(212,175,55,0.14)");
+    g.addColorStop(1, "rgba(212,175,55,0)");
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, 1200, 675);
+    ctx.strokeStyle = "rgba(212,175,55,0.5)";
+    ctx.lineWidth = 6;
+    ctx.strokeRect(24, 24, 1152, 627);
+    drawBull(ctx, 60, 60, 130, "gold");
+  }
 
   ctx.fillStyle = "#D4AF37";
   ctx.font = "900 44px Impact, sans-serif";
@@ -199,10 +210,30 @@ export function Hands() {
   const [storyName, setStoryName] = useState("");
   const [storyText, setStoryText] = useState("");
   const [cardUrl, setCardUrl] = useState<string | null>(null);
+  const [storyBg, setStoryBg] = useState<HTMLImageElement | null>(null);
+
+  useEffect(() => {
+    fetch("/api/assets")
+      .then((r) => r.json())
+      .then((json) => {
+        const s = json.slots?.["story-card-bg"];
+        const url = s?.url ? `${s.url}?v=${s.uploadedAt}` : slotUrl("story-card-bg");
+        const img = new Image();
+        img.crossOrigin = "anonymous";
+        img.onload = () => setStoryBg(img);
+        img.src = url;
+      })
+      .catch(() => {
+        const img = new Image();
+        img.crossOrigin = "anonymous";
+        img.onload = () => setStoryBg(img);
+        img.src = slotUrl("story-card-bg");
+      });
+  }, []);
 
   function makeCard() {
     if (!storyText.trim()) return;
-    const url = generateStoryCard(storyName, storyText.trim(), tier.label);
+    const url = generateStoryCard(storyName, storyText.trim(), tier.label, storyBg);
     setCardUrl(url);
     if (url) fireConfetti({ count: 80 });
   }

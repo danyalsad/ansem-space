@@ -13,13 +13,15 @@
 import { useCallback, useEffect, useState, type ChangeEvent } from "react";
 import { motion } from "framer-motion";
 import bs58 from "bs58";
-import { CheckCircle2, Clock, ImagePlus, Lock, ShieldCheck, Trash2, Wallet } from "lucide-react";
+import { CheckCircle2, Copy, ExternalLink, ImagePlus, Lock, ShieldCheck, Trash2, Wallet } from "lucide-react";
 import { BullLogo } from "@/components/BullLogo";
 import { Button } from "@/components/ui/button";
 import { useWallet } from "@/components/WalletProvider";
 import {
   ASSET_SLOTS,
   SLOT_GROUP_LABELS,
+  SLOT_USAGE,
+  slotUrl,
   type SlotGroup,
 } from "@/lib/asset-manifest";
 import { CREATOR_WALLET } from "@/lib/constants";
@@ -202,35 +204,56 @@ export default function AdminPage() {
                     return (
                       <div key={s.slot} className="flex gap-4 border border-edge bg-panel p-4">
                         {/* Preview */}
-                        <div className="flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden border border-edge bg-void">
-                          {current ? (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img
-                              src={`${current.url}?v=${current.uploadedAt}`}
-                              alt={s.name}
-                              className="h-full w-full object-contain"
-                            />
-                          ) : (
-                            <span className="font-mono text-[9px] text-ash/50">empty</span>
-                          )}
+                        <div className="flex h-28 w-28 shrink-0 items-center justify-center overflow-hidden border border-edge bg-void">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={
+                              current
+                                ? `${current.url}?v=${current.uploadedAt}`
+                                : slotUrl(s.slot)
+                            }
+                            alt={s.name}
+                            className="h-full w-full object-contain"
+                          />
                         </div>
                         <div className="min-w-0 flex-1">
                           <div className="flex items-start justify-between gap-2">
                             <h3 className="font-display text-[11px] uppercase tracking-wide text-bone">
                               {s.name}
                             </h3>
-                            {s.live ? (
-                              <span className="flex shrink-0 items-center gap-1 font-mono text-[9px] uppercase text-gold" title="The site reads this URL right now">
-                                <CheckCircle2 size={10} /> live
-                              </span>
-                            ) : (
-                              <span className="flex shrink-0 items-center gap-1 font-mono text-[9px] uppercase text-ash" title="Upload now — wired into the site in the next update">
-                                <Clock size={10} /> next update
-                              </span>
-                            )}
+                            <span
+                              className="flex shrink-0 items-center gap-1 font-mono text-[9px] uppercase text-gold"
+                              title="The site reads this URL right now"
+                            >
+                              <CheckCircle2 size={10} /> live
+                            </span>
                           </div>
                           <p className="mt-1 text-[11px] leading-snug text-ash">{s.description}</p>
                           <p className="mt-1.5 font-mono text-[10px] text-gold-dim">{s.spec}</p>
+                          {SLOT_USAGE[s.slot] && (
+                            <p className="mt-1 font-mono text-[9px] text-ash/80">
+                              Used in: <span className="text-bone">{SLOT_USAGE[s.slot]}</span>
+                            </p>
+                          )}
+                          <div className="mt-2 flex flex-wrap items-center gap-2">
+                            <a
+                              href={current?.url ?? slotUrl(s.slot)}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 font-mono text-[9px] text-gold hover:text-gold-glow"
+                            >
+                              <ExternalLink size={10} /> Live URL
+                            </a>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                navigator.clipboard.writeText(current?.url ?? slotUrl(s.slot))
+                              }
+                              className="inline-flex items-center gap-1 font-mono text-[9px] text-ash hover:text-bone"
+                            >
+                              <Copy size={10} /> Copy
+                            </button>
+                          </div>
                           <label
                             className={cn(
                               "mt-2.5 inline-flex cursor-pointer items-center gap-1.5 border border-gold/40 px-3 py-1.5 font-display text-[10px] uppercase tracking-wider text-gold transition-all hover:bg-gold/10",
