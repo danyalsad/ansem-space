@@ -57,7 +57,7 @@ route rewrites the URL to `sslmode=no-verify`. Don't remove that.
 ## Key files
 
 - `lib/constants.ts` — CA, ticker, links, CREATOR_WALLET, CREATOR_NAME/HANDLE/TAGLINE/STORY, shareOnX (appends creator credit), LS keys
-- `lib/quests.ts` — 5 daily + 5 weekly quests, progress tracking, claim rewards, daily-challenge HP marker
+- `lib/quests.ts` — 6 daily + 5 weekly quests (incl. Daily Ritual activity quest), progress tracking, claim rewards
 - `lib/referrals.ts` — referral codes, tiered rewards (1/3/5/10 recruits), ?ref= capture
 - `lib/palette.ts` — single source of color truth for ALL canvas renderers/logo/favicon (gold `#D4AF37`, crimson `#C8102E`; the original bright `#FFD700` was explicitly rejected — never reintroduce it)
 - `lib/bull.ts` — shared bull-mark SVG path constants + `drawBull()`
@@ -74,13 +74,13 @@ route rewrites the URL to `sslmode=no-verify`. Don't remove that.
 - `app/globals.css` — surface-card, gradient-border, section-shell utilities; aurora bg (no cyber-grid clutter)
 - `components/CreatorSpotlight.tsx` — "Built by Dr Danny" hero banner + Hall of Builders (#builders)
 - `components/AchievementRoadmap.tsx` — visual HP milestones + badge progress grid
-- `components/sections/Charge.tsx` — Arcade hub: Charge runner, Bull Tap, Hold the Line; shared stampede board
-- `lib/arcade-audio.ts` — Web Audio synth SFX (jump, coin, combo, powerup, near-miss, diamond/paper) shared across arcade games
-- `components/games/ChargeRunner.tsx` — endless runner: market zones (bull→meme→bear), parallax skyline, dip/pump/whale/flybear entities, near-miss + milestone bonuses, synth sfx
-- `components/games/BullTap.tsx` — 30s reflex tap: streak multipliers, frenzy mode (last 5s 2×), candle chart backdrop
-- `components/games/HoldTheLine.tsx` — diamond-hands hold/release with live chart canvas, zone pulse sfx
-- `lib/games.ts` — per-game highs + unified leaderboard (`game` field on scores)
-- `components/sections/` — Forge (+ weekly Meme Battle contest banner), Charge (Arcade), Quests (daily/weekly missions, referrals, roadmap), Herd, Hands, Lore, Intel (global poll via /api/polls, local fallback)
+- `components/sections/Charge.tsx` — Playground: 6 games + daily activities (spin, GM, riddle)
+- `lib/arcade-audio.ts` — Web Audio synth SFX shared across arcade games
+- `components/games/` — ChargeRunner, BullTap, HoldTheLine, PumpOrDump, RugDodge, BullMatch
+- `components/activities/DailyActivities.tsx` — Bull Spin wheel, GM Stamp, Bull Riddle (once/day each)
+- `lib/daily-activities.ts` — daily activity state + riddle pool + spin prize table
+- `lib/games.ts` — per-game highs (`charge|tap|hold|pump|rug|match`) + unified leaderboard
+- `components/sections/` — Forge, Charge (Playground), Quests, Herd, Hands, Lore, Intel
 
 ## Current state (all verified on production)
 
