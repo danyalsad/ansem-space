@@ -150,7 +150,7 @@ export function awardPoints(
       gained = Math.min(400, Math.max(10, Math.floor(score / 50)));
       data.counters.games += 1;
       data.counters.bestScore = Math.max(data.counters.bestScore, score);
-      label = "Charge run";
+      label = "Arcade run";
       break;
     }
     case "meme_post":

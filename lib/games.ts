@@ -3,7 +3,7 @@
 import { LS } from "@/lib/constants";
 import { store } from "@/lib/utils";
 
-export type ArcadeGame = "charge" | "tap" | "hold";
+export type ArcadeGame = "charge" | "tap" | "hold" | "pump" | "rug" | "match";
 
 export interface ArcadeScore {
   name: string;
@@ -15,9 +15,12 @@ export interface GameHighs {
   charge: number;
   tap: number;
   hold: number;
+  pump: number;
+  rug: number;
+  match: number;
 }
 
-const DEFAULT_HIGHS: GameHighs = { charge: 0, tap: 0, hold: 0 };
+const DEFAULT_HIGHS: GameHighs = { charge: 0, tap: 0, hold: 0, pump: 0, rug: 0, match: 0 };
 
 export function loadHighs(): GameHighs {
   return { ...DEFAULT_HIGHS, ...store.get<Partial<GameHighs>>(LS.gameHighs, {}) };
@@ -49,4 +52,12 @@ export const GAME_LABELS: Record<ArcadeGame, string> = {
   charge: "Charge",
   tap: "Bull Tap",
   hold: "Hold the Line",
+  pump: "Pump or Dump",
+  rug: "Rug Dodge",
+  match: "Bull Match",
+};
+
+export const GAME_CATEGORIES = {
+  action: ["charge", "tap", "rug"] as ArcadeGame[],
+  skill: ["hold", "pump", "match"] as ArcadeGame[],
 };

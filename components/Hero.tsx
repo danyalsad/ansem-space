@@ -18,7 +18,7 @@ const TICKER = [
 
 const FEATURES = [
   { icon: Flame, label: "Meme Forge", desc: "Create & share", href: "#forge", color: "text-gold" },
-  { icon: Gamepad2, label: "Arcade", desc: "3 mini-games", href: "#charge", color: "text-crimson-bright" },
+  { icon: Gamepad2, label: "Playground", desc: "6 games + daily", href: "#charge", color: "text-crimson-bright" },
   { icon: Target, label: "Quests", desc: "Daily HP", href: "#quests", color: "text-bone" },
 ];
 

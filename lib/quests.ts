@@ -13,7 +13,7 @@ import {
 import { store } from "@/lib/utils";
 
 export type QuestPeriod = "daily" | "weekly";
-export type QuestTrigger = "game" | "meme_post" | "upvote" | "intel" | "share" | "daily" | "quest_claim";
+export type QuestTrigger = "game" | "meme_post" | "upvote" | "intel" | "share" | "daily" | "quest_claim" | "activity";
 
 export interface QuestDef {
   id: string;
@@ -34,8 +34,8 @@ export const QUESTS: QuestDef[] = [
   {
     id: "daily-runs-3",
     period: "daily",
-    title: "Charge Forward",
-    desc: "Complete 3 Charge runs",
+    title: "Arcade Grinder",
+    desc: "Complete 3 arcade runs (any game)",
     emoji: "🏃",
     target: 3,
     reward: 75,
@@ -81,6 +81,16 @@ export const QUESTS: QuestDef[] = [
     reward: 40,
     triggers: ["share"],
   },
+  {
+    id: "daily-gm-spin",
+    period: "daily",
+    title: "Daily Ritual",
+    desc: "Complete any daily activity (spin, GM, or riddle)",
+    emoji: "🎁",
+    target: 1,
+    reward: 45,
+    triggers: ["activity"],
+  },
   // ── Weekly ──
   {
     id: "weekly-memes-5",
@@ -96,7 +106,7 @@ export const QUESTS: QuestDef[] = [
     id: "weekly-runs-15",
     period: "weekly",
     title: "Stampede Runner",
-    desc: "Complete 15 Charge runs",
+    desc: "Complete 15 arcade runs (any game)",
     emoji: "⚡",
     target: 15,
     reward: 150,

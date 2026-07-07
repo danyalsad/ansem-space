@@ -4,7 +4,7 @@
 > recent state before pushing.** A stale handoff is worse than none — treat
 > updating it as part of the commit, not an afterthought.
 
-Last updated: 2026-07-06 · v10 design system overhaul (2026 visual refresh)
+Last updated: 2026-07-06 · v11 playground expansion (6 games + daily activities)
 
 ## What this is
 
