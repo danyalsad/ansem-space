@@ -10,6 +10,7 @@ export const TAGLINE = "Forge Memes. Charge Forward. Hold the Line.";
 export const LINKS = {
   pumpFun: `https://pump.fun/coin/${CONTRACT_ADDRESS}`,
   jupiter: `https://jup.ag/swap/SOL-${CONTRACT_ADDRESS}`,
+  solscan: `https://solscan.io/token/${CONTRACT_ADDRESS}`,
   ansemX: "https://x.com/blknoiz06",
   creatorX: "https://x.com/DannyMD_UK",
 };

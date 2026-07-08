@@ -20,6 +20,7 @@ const NAV_LINKS = [
   { href: "#herd", label: "Herd" },
   { href: "#hands", label: "Hands" },
   { href: "#lore", label: "Lore" },
+  { href: "#analytics", label: "Analytics" },
   { href: "#intel", label: "Intel" },
 ];
 

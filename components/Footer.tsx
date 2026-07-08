@@ -53,7 +53,7 @@ export function Footer() {
             <h4 className="font-display text-sm font-semibold text-bone">Disclaimer</h4>
             <p className="mt-4 text-sm leading-relaxed text-mist">
               Community-built fan site — not affiliated with Ansem (@blknoiz06). Market data via
-              DexScreener; on-chain via Helius. $ANSEM is a meme coin with no intrinsic value.
+              DexScreener; on-chain via Helius &amp; Solscan. $ANSEM is a meme coin with no intrinsic value.
               Not financial advice.
             </p>
           </div>

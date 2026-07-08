@@ -9,6 +9,7 @@ import { Herd } from "@/components/sections/Herd";
 import { Hands } from "@/components/sections/Hands";
 import { Lore } from "@/components/sections/Lore";
 import { Intel } from "@/components/sections/Intel";
+import { Analytics } from "@/components/sections/Analytics";
 import { Footer } from "@/components/Footer";
 import { FloatingCTA } from "@/components/FloatingCTA";
 
@@ -25,6 +26,7 @@ export default function Home() {
       <Herd />
       <Hands />
       <Lore />
+      <Analytics />
       <Intel />
       <Footer />
       <FloatingCTA />
